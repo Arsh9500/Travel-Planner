@@ -132,7 +132,7 @@ function About() {
               <span className="contact-icon">Email</span>
               <div>
                 <strong>Email Us</strong>
-                <a href="mailto:arsh10@op.ac.nz">arsh10@op.ac.nz</a>
+                <a href="mailto:TravelPlanner@op.ac.nz">TravelPlanner@op.ac.nz</a>
               </div>
             </div>
             <div className="contact-detail">

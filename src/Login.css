@@ -13,9 +13,11 @@
   justify-content: center;
   align-items: center;
   background:
+    radial-gradient(circle at 50% 8%, rgba(255, 183, 77, 0.18), transparent 30%),
     radial-gradient(circle at 12% 20%, rgba(10, 132, 255, 0.24), transparent 38%),
     radial-gradient(circle at 88% 78%, rgba(0, 200, 160, 0.22), transparent 42%),
     linear-gradient(140deg, #f4f8fc 0%, #eef3f9 40%, #e9f1f7 100%);
+  perspective: 1100px;
 }
 
 .login-box {
@@ -26,8 +28,15 @@
   border: 1px solid rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(8px);
   text-align: left;
-  box-shadow: 0 28px 60px rgba(13, 38, 76, 0.16);
+  box-shadow: 0 34px 76px rgba(13, 38, 76, 0.2);
   animation: loginRise 360ms ease-out;
+  transform-style: preserve-3d;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.login-box:hover {
+  transform: rotateX(2deg) translateY(-3px) translateZ(12px);
+  box-shadow: 0 42px 86px rgba(13, 38, 76, 0.24);
 }
 
 .back-home {

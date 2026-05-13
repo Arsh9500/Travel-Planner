@@ -1,7 +1,9 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+import json
 import requests as http_req
+import os
 from pathlib import Path
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -15,6 +17,10 @@ from places_service import search_places
 
 ROOT_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(ROOT_ENV_PATH, override=True)
+
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "180"))
 
 
 app = Flask(__name__)
@@ -239,6 +245,44 @@ def score_hotel_row(row, payload, distance, past_choice_profile):
     )
 
 
+def parse_attraction_response(raw_response):
+    if not raw_response:
+        return []
+
+    try:
+        parsed = json.loads(raw_response)
+    except json.JSONDecodeError:
+        start = raw_response.find("[")
+        end = raw_response.rfind("]")
+        if start == -1 or end == -1 or end <= start:
+            return [
+                {"name": line.strip("-* 1234567890. "), "reason": ""}
+                for line in raw_response.splitlines()
+                if line.strip()
+            ][:5]
+        try:
+            parsed = json.loads(raw_response[start : end + 1])
+        except json.JSONDecodeError:
+            return []
+
+    if isinstance(parsed, dict):
+        parsed = parsed.get("attractions", [])
+
+    attractions = []
+    for item in parsed[:5] if isinstance(parsed, list) else []:
+        if isinstance(item, str):
+            attractions.append({"name": item, "reason": ""})
+        elif isinstance(item, dict) and item.get("name"):
+            attractions.append(
+                {
+                    "name": str(item.get("name", "")).strip(),
+                    "reason": str(item.get("reason", "")).strip(),
+                }
+            )
+
+    return attractions
+
+
 @app.get("/")
 def health_check():
     return jsonify({"message": "Travel Planner ML API is running."})
@@ -301,6 +345,54 @@ def recommend_hotels():
             "message": "Hotels ranked from best to least suitable.",
         }
     )
+
+
+@app.post("/recommend-attractions")
+def recommend_attractions():
+    payload = request.get_json(silent=True) or {}
+    destination = (payload.get("destination") or "").strip()
+    preferences = payload.get("preferences") or {}
+
+    if not destination:
+        return jsonify({"error": "destination is required"}), 400
+
+    preference_text = ", ".join(
+        str(value).strip()
+        for value in preferences.values()
+        if value is not None and str(value).strip()
+    )
+
+    prompt = (
+        "Recommend 5 tourist attractions for a travel itinerary. "
+        "Use the destination and preferences to personalize the list. "
+        "Return only valid JSON as an array of objects with name and reason fields. "
+        f"Destination: {destination}. "
+        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}."
+    )
+
+    try:
+        ollama_resp = http_req.post(
+            OLLAMA_API_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
+        ollama_resp.raise_for_status()
+        raw_response = ollama_resp.json().get("response", "")
+        attractions = parse_attraction_response(raw_response)
+        return jsonify({"attractions": attractions, "raw": raw_response})
+    except http_req.exceptions.ConnectionError:
+        return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except http_req.exceptions.ReadTimeout:
+        return jsonify(
+            {
+                "error": (
+                    f"Ollama took longer than {OLLAMA_TIMEOUT_SECONDS} seconds to respond. "
+                    "Try again after the model finishes loading, or use a smaller model."
+                )
+            }
+        ), 504
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.post("/chat/gemini")
@@ -403,15 +495,24 @@ def weather_ai_suggestions():
 
     try:
         ollama_resp = http_req.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "gemma3:1b", "prompt": prompt, "stream": False},
-            timeout=60,
+            OLLAMA_API_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=OLLAMA_TIMEOUT_SECONDS,
         )
         ollama_resp.raise_for_status()
         suggestions = ollama_resp.json().get("response", "")
         return jsonify({"suggestions": suggestions})
     except http_req.exceptions.ConnectionError:
         return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except http_req.exceptions.ReadTimeout:
+        return jsonify(
+            {
+                "error": (
+                    f"Ollama took longer than {OLLAMA_TIMEOUT_SECONDS} seconds to respond. "
+                    "Try again after the model finishes loading, or use a smaller model."
+                )
+            }
+        ), 504
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

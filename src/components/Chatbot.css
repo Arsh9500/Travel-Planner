@@ -15,6 +15,13 @@
   padding: 6px 10px;
   font-size: 0.78rem;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.chatbot-suggestion-btn:hover {
+  border-color: #7aa7e8;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+  transform: translateY(-1px);
 }
 
 .chatbot-empty,
@@ -42,11 +49,17 @@
 }
 
 .chatbot-place-card {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid #dbe4f0;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chatbot-place-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 42px rgba(15, 23, 42, 0.16);
 }
 
 .chatbot-place-photo {
