@@ -303,6 +303,7 @@
 .home-card-budget .home-card-image { background-position: center; }
 .home-card-hotel .home-card-image { background-position: center; }
 .home-card-weather .home-card-image { background-position: center 20%; }
+.home-card-attractions .home-card-image { background-position: center; }
  
 .home-card-body {
   padding: 32px 28px;
@@ -369,20 +370,26 @@
 
 .chatbot-toggle {
   position: fixed;
+  top: 50%;
   right: 20px;
-  bottom: 20px;
+  bottom: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   border: none;
   border-radius: 999px;
   padding: 11px 18px;
+  min-width: 0;
+  width: auto;
+  height: auto;
   background: #1d4ed8;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   z-index: 1000;
+  transform: translateY(-50%);
 }
 
 .chatbot-badge {
@@ -402,8 +409,9 @@
 
 .chatbot-panel {
   position: fixed;
-  right: 20px;
-  bottom: 70px;
+  top: 50%;
+  right: 86px;
+  bottom: auto;
   width: min(360px, calc(100vw - 30px));
   height: 420px;
   background: #fff;
@@ -415,6 +423,24 @@
   flex-direction: column;
   overflow: hidden;
   z-index: 1000;
+  transform: translateY(-50%);
+}
+
+@media (max-width: 760px) {
+  .chatbot-toggle {
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+    transform: none;
+  }
+
+  .chatbot-panel {
+    top: auto;
+    right: 12px;
+    bottom: 70px;
+    transform: none;
+    max-height: calc(100vh - 92px);
+  }
 }
 
 @keyframes heroLift {

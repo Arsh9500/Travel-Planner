@@ -12,7 +12,7 @@ function canSend(templateId) {
 
 async function sendTemplate(templateId, params) {
   if (!canSend(templateId)) {
-    throw new Error("Email service is not configured.");
+    throw new Error("Email delivery is currently unavailable.");
   }
 
   return emailjs.send(SERVICE_ID, templateId, params, {
@@ -25,9 +25,11 @@ export async function sendContactEmail({ firstName, lastName, email, message }) 
     first_name: firstName,
     last_name: lastName,
     from_name: `${firstName} ${lastName}`.trim(),
-    reply_to: email,
-    email,
-    to_email: CONTACT_RECIPIENT,
+    reply_to: CONTACT_RECIPIENT,
+    email: CONTACT_RECIPIENT,
+    to_email: email,
+    visitor_email: email,
+    admin_email: CONTACT_RECIPIENT,
     message,
   });
 }
@@ -47,18 +49,4 @@ export function isEmailServiceConfigured() {
 
 export function isWelcomeEmailConfigured() {
   return Boolean(PUBLIC_KEY && SERVICE_ID && WELCOME_TEMPLATE_ID);
-}
-
-export function buildContactMailto({ firstName, lastName, email, message }) {
-  const fullName = `${firstName || ""} ${lastName || ""}`.trim() || "Website visitor";
-  const subject = `Trip Planner contact form message from ${fullName}`;
-  const body = [
-    `Name: ${fullName}`,
-    `Email: ${email || ""}`,
-    "",
-    "Message:",
-    message || "",
-  ].join("\n");
-
-  return `mailto:${CONTACT_RECIPIENT}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

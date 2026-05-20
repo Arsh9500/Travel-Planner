@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Logo from "./components/Logo";
-import { buildContactMailto, CONTACT_RECIPIENT, isEmailServiceConfigured, sendContactEmail } from "./utils/email";
+import { isEmailServiceConfigured, sendContactEmail } from "./utils/email";
 import "./About.css";
 
 const founders = [
@@ -27,6 +27,10 @@ const features = [
   "Weather info",
 ];
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 function About() {
   const { user, logout } = useAuth();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", message: "" });
@@ -39,32 +43,35 @@ function About() {
     setContactStatus("");
     setContactError("");
 
-    if (!form.firstName.trim() || !form.email.trim() || !form.message.trim()) {
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    const recipientEmail = form.email.trim();
+    const message = form.message.trim();
+
+    if (!firstName || !recipientEmail || !message) {
       setContactError("Please fill first name, email, and message.");
       return;
     }
 
+    if (!isValidEmail(recipientEmail)) {
+      setContactError("Please enter a valid recipient email address.");
+      return;
+    }
+
     if (!isEmailServiceConfigured()) {
-      window.location.href = buildContactMailto({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim(),
-        message: form.message.trim(),
-      });
-      setContactStatus(`Your email app was opened to send this message to ${CONTACT_RECIPIENT}.`);
-      setForm({ firstName: "", lastName: "", email: "", message: "" });
+      setContactError("Email delivery is currently unavailable. Please contact us using the email address shown on this page.");
       return;
     }
 
     try {
       setSending(true);
       await sendContactEmail({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim(),
-        message: form.message.trim(),
+        firstName,
+        lastName,
+        email: recipientEmail,
+        message,
       });
-      setContactStatus(`Message sent successfully to ${CONTACT_RECIPIENT}.`);
+      setContactStatus(`Message sent successfully to ${recipientEmail}.`);
       setForm({ firstName: "", lastName: "", email: "", message: "" });
     } catch (error) {
       setContactError(error.message || "Could not send message.");
@@ -172,7 +179,7 @@ function About() {
                 </div>
                 <input
                   type="email"
-                  placeholder="Email Address"
+                  placeholder="Recipient Email Address"
                   value={form.email}
                   onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                 />

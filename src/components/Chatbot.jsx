@@ -525,9 +525,13 @@ function Chatbot({ user }) {
       <button
         type="button"
         className="chatbot-toggle"
+        aria-label={chatOpen ? "Close travel chatbot" : "Open travel chatbot"}
         onClick={() => setChatOpen((prev) => !prev)}
       >
-        {chatOpen ? "Close Chat" : "Chat"}
+        <span className="chatbot-toggle-icon" aria-hidden="true">
+          {chatOpen ? "x" : "💬"}
+        </span>
+        <span>{chatOpen ? "Close Chat" : "Chat"}</span>
         {!chatOpen && chatBadgeCount > 0 && (
           <span className="chatbot-badge">{chatBadgeCount}</span>
         )}
@@ -535,7 +539,10 @@ function Chatbot({ user }) {
 
       {chatOpen && (
         <div className="chatbot-panel">
-          <div className="chatbot-header">Travel Chatbot</div>
+          <div className="chatbot-header">
+            <span className="chatbot-header-avatar" aria-hidden="true">🤖</span>
+            <span>Travel Chatbot</span>
+          </div>
 
           <div className="chatbot-suggestions">
             {QUICK_SUGGESTIONS.map((suggestion) => (
@@ -553,6 +560,7 @@ function Chatbot({ user }) {
           <div className="chatbot-messages">
             {chatMessages.length === 0 && (
               <div className="chatbot-empty">
+                <span className="chatbot-empty-icon" aria-hidden="true">✈️</span>
                 Ask about hotels, attractions, destinations, budgets, or nearby places.
               </div>
             )}
@@ -560,6 +568,9 @@ function Chatbot({ user }) {
             {chatMessages.map((message) => (
               <div key={message.id} className="chatbot-message-wrap">
                 <div className={`chatbot-message ${message.role === "user" ? "chat-user" : "chat-bot"}`}>
+                  {message.role === "bot" && (
+                    <span className="chatbot-message-icon" aria-hidden="true">🤖</span>
+                  )}
                   {message.text}
                 </div>
 
