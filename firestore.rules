@@ -30,6 +30,26 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // Shared group itineraries. Owners and invited collaborator emails can read/edit.
+    match /groupTrips/{tripId} {
+      function isGroupMember() {
+        return isSignedIn() &&
+          (resource.data.ownerUid == request.auth.uid ||
+            request.auth.token.email in resource.data.collaboratorEmails);
+      }
+
+      allow read: if isGroupMember();
+
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.auth.token.email in request.resource.data.editorEmails;
+
+      allow update: if isGroupMember() &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+
+      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

@@ -5,6 +5,8 @@ import json
 import requests as http_req
 import os
 from pathlib import Path
+import time
+import uuid
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.neighbors import NearestNeighbors
@@ -283,6 +285,80 @@ def parse_attraction_response(raw_response):
     return attractions
 
 
+def normalize_card_number(value):
+    return "".join(char for char in str(value or "") if char.isdigit())[:19]
+
+
+def validate_payment_payload(payload):
+    required = ["amount", "currency", "paymentMethod", "booking"]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return f"Missing required fields: {', '.join(missing)}"
+
+    try:
+        amount = float(payload["amount"])
+    except (TypeError, ValueError):
+        return "amount must be numeric"
+
+    if amount <= 0:
+        return "amount must be greater than 0"
+
+    payment_method = payload.get("paymentMethod")
+    if payment_method not in {"Credit Card", "Debit Card", "Pay at Hotel"}:
+        return "paymentMethod must be Credit Card, Debit Card, or Pay at Hotel"
+
+    booking = payload.get("booking") or {}
+    for field in ["hotelName", "destination", "checkInDate", "checkOutDate", "guests"]:
+        if not booking.get(field):
+            return f"booking.{field} is required"
+
+    if payment_method == "Pay at Hotel":
+        return None
+
+    payment_details = payload.get("paymentDetails") or {}
+    card_number = normalize_card_number(payment_details.get("cardNumber"))
+    if len(card_number) < 13:
+        return "A valid card number is required"
+    if not str(payment_details.get("cardholderName") or "").strip():
+        return "cardholderName is required"
+    if not str(payment_details.get("expiryDate") or "").strip():
+        return "expiryDate is required"
+    if not str(payment_details.get("cvv") or "").isdigit():
+        return "cvv is required"
+
+    return None
+
+
+def validate_crypto_confirmation_payload(payload):
+    required = ["txHash", "walletAddress", "chainId", "amount", "currency", "booking"]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return f"Missing required fields: {', '.join(missing)}"
+
+    tx_hash = str(payload.get("txHash") or "")
+    wallet_address = str(payload.get("walletAddress") or "")
+
+    if not tx_hash.startswith("0x") or len(tx_hash) < 12:
+        return "A valid transaction hash is required"
+    if not wallet_address.startswith("0x") or len(wallet_address) != 42:
+        return "A valid wallet address is required"
+
+    try:
+        amount = float(payload["amount"])
+    except (TypeError, ValueError):
+        return "amount must be numeric"
+
+    if amount <= 0:
+        return "amount must be greater than 0"
+
+    booking = payload.get("booking") or {}
+    for field in ["hotelName", "destination", "checkInDate", "checkOutDate", "guests"]:
+        if not booking.get(field):
+            return f"booking.{field} is required"
+
+    return None
+
+
 @app.get("/")
 def health_check():
     return jsonify({"message": "Travel Planner ML API is running."})
@@ -476,6 +552,76 @@ def chat_message():
         return jsonify({"error": str(exc)}), 502
 
     return jsonify(result)
+
+
+@app.post("/payments/process")
+def process_payment():
+    payload = request.get_json(silent=True) or {}
+    validation_error = validate_payment_payload(payload)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+
+    payment_method = payload["paymentMethod"]
+    amount = round(float(payload["amount"]), 2)
+    currency = str(payload.get("currency") or "USD").upper()
+    payment_details = payload.get("paymentDetails") or {}
+    card_last4 = ""
+
+    # Simulate a gateway handoff. In production, replace this with Stripe/Adyen/etc.
+    # Never store full card numbers or CVV in this app's database.
+    if payment_method != "Pay at Hotel":
+        card_last4 = normalize_card_number(payment_details.get("cardNumber"))[-4:]
+        time.sleep(0.4)
+
+    transaction_id = f"PAY-{uuid.uuid4().hex[:12].upper()}"
+    booking_reference = f"HB-{uuid.uuid4().hex[:10].upper()}"
+
+    return jsonify(
+        {
+            "ok": True,
+            "transactionId": transaction_id,
+            "bookingReference": booking_reference,
+            "amount": amount,
+            "currency": currency,
+            "paymentMethod": payment_method,
+            "paymentStatus": "Pending" if payment_method == "Pay at Hotel" else "Paid",
+            "bookingStatus": "Confirmed",
+            "cardLast4": card_last4,
+            "gatewayMode": "mock-secure",
+        }
+    )
+
+
+@app.post("/payments/crypto/confirm")
+def confirm_crypto_payment():
+    payload = request.get_json(silent=True) or {}
+    validation_error = validate_crypto_confirmation_payload(payload)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+
+    amount = round(float(payload["amount"]), 2)
+    currency = str(payload.get("currency") or "USD").upper()
+    booking_reference = f"HB-BC-{uuid.uuid4().hex[:8].upper()}"
+
+    # This records the wallet transaction metadata for a testnet/demo flow.
+    # A production service should verify the transaction receipt through a trusted RPC provider.
+    return jsonify(
+        {
+            "ok": True,
+            "transactionId": f"CHAIN-{uuid.uuid4().hex[:12].upper()}",
+            "bookingReference": booking_reference,
+            "amount": amount,
+            "currency": currency,
+            "paymentMethod": "Blockchain/Crypto",
+            "paymentStatus": "Confirmed on test network",
+            "bookingStatus": "Confirmed",
+            "txHash": payload["txHash"],
+            "walletAddress": payload["walletAddress"],
+            "chainId": payload["chainId"],
+            "cryptoAmount": payload.get("cryptoAmount") or "",
+            "gatewayMode": "blockchain-testnet",
+        }
+    )
 
 
 @app.post("/weather-ai")

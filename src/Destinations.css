@@ -336,6 +336,35 @@
   font-size: 0.8rem;
 }
 
+.crypto-wallet-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(27, 103, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(231, 241, 255, 0.72);
+}
+
+.crypto-wallet-panel p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.wallet-status {
+  margin: 10px 0 0;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.crypto-payment-error {
+  display: block;
+  margin-top: 8px;
+  color: #c0392b;
+  font-weight: 700;
+}
+
 .payment-methods {
   display: flex;
   flex-wrap: wrap;
@@ -659,6 +688,10 @@
   }
 
   .hotel-booking-header {
+    flex-direction: column;
+  }
+
+  .crypto-wallet-panel {
     flex-direction: column;
   }
 }

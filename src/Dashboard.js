@@ -6,6 +6,13 @@ import { loadUserTrips, saveUserTrips } from "./utils/trips";
 import { loadUserBudgets, saveUserBudgets } from "./utils/budgets";
 import { loadUserWishlist, saveUserWishlist } from "./utils/wishlist";
 import { categorizeTrips } from "./utils/tripStatus";
+import {
+  deleteSharedTrip,
+  formatCollaboratorEmails,
+  loadSharedTrips,
+  parseCollaboratorEmails,
+  saveSharedTrip,
+} from "./utils/sharedTrips";
 import "./Dashboard.css";
 
 function toLabel(value) {
@@ -23,16 +30,32 @@ function toLabel(value) {
     .join(", ");
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function money(value) {
+  return `$${Number(value || 0).toLocaleString()}`;
+}
+
 function Dashboard() {
   const { user } = useAuth();
   const displayName =
     user?.displayName || user?.name || user?.email?.split("@")[0] || "Traveler";
   const [trips, setTrips] = useState([]);
+  const [sharedTrips, setSharedTrips] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [hotelBookings, setHotelBookings] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [editingTripId, setEditingTripId] = useState("");
+  const [editingGroupTripId, setEditingGroupTripId] = useState("");
   const [status, setStatus] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [form, setForm] = useState({
     destination: "",
@@ -42,19 +65,30 @@ function Dashboard() {
     estimatedCost: "",
     notes: "",
   });
+  const [groupForm, setGroupForm] = useState({
+    destination: "",
+    startDate: "",
+    endDate: "",
+    budget: "",
+    estimatedCost: "",
+    collaborators: "",
+    notes: "",
+  });
 
   useEffect(() => {
     let ignore = false;
 
     const syncData = async () => {
-      const [savedTrips, savedBudgets, savedWishlist, savedHotelBookings] = await Promise.all([
+      const [savedTrips, savedSharedTrips, savedBudgets, savedWishlist, savedHotelBookings] = await Promise.all([
         loadUserTrips(user?.uid),
+        loadSharedTrips(user),
         loadUserBudgets(user?.uid),
         loadUserWishlist(user?.uid),
         loadUserHotelBookings(user?.uid),
       ]);
       if (ignore) return;
       setTrips(savedTrips);
+      setSharedTrips(savedSharedTrips);
       setBudgets(savedBudgets);
       setWishlist(savedWishlist);
       setHotelBookings(
@@ -66,7 +100,7 @@ function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, [user?.uid]);
+  }, [user]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDate(new Date()), 60000);
@@ -81,6 +115,13 @@ function Dashboard() {
       return (a.startDate || "").localeCompare(b.startDate || "");
     });
   }, [trips]);
+
+  const groupTrips = useMemo(() => {
+    return [...sharedTrips].sort((a, b) => {
+      if (a.startDate === b.startDate) return (a.destination || "").localeCompare(b.destination || "");
+      return (a.startDate || "").localeCompare(b.startDate || "");
+    });
+  }, [sharedTrips]);
 
   const { upcoming: upcomingTrips, ongoing: ongoingTrips, completed: completedTrips } = useMemo(() => {
     return categorizeTrips(itineraryTrips, todayString);
@@ -135,6 +176,23 @@ function Dashboard() {
     saveUserWishlist(user?.uid, nextWishlist);
   };
 
+  const saveGroupTripToDb = async (nextTrip) => {
+    const result = await saveSharedTrip(user, nextTrip);
+    if (!result.ok) {
+      setStatus(result.error);
+      return false;
+    }
+
+    setSharedTrips((prev) => {
+      const exists = prev.some((trip) => trip.id === nextTrip.id);
+      if (exists) {
+        return prev.map((trip) => (trip.id === nextTrip.id ? { ...trip, ...nextTrip } : trip));
+      }
+      return [...prev, nextTrip];
+    });
+    return true;
+  };
+
   const resetForm = () => {
     setEditingTripId("");
     setForm({
@@ -147,9 +205,27 @@ function Dashboard() {
     });
   };
 
+  const resetGroupForm = () => {
+    setEditingGroupTripId("");
+    setGroupForm({
+      destination: "",
+      startDate: "",
+      endDate: "",
+      budget: "",
+      estimatedCost: "",
+      collaborators: "",
+      notes: "",
+    });
+  };
+
   const onChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onGroupChange = (e) => {
+    const { name, value } = e.target;
+    setGroupForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const onSubmit = (e) => {
@@ -185,6 +261,42 @@ function Dashboard() {
     resetForm();
   };
 
+  const onGroupSubmit = async (e) => {
+    e.preventDefault();
+    if (!groupForm.destination.trim() || !groupForm.startDate) return;
+
+    const collaboratorEmails = parseCollaboratorEmails(groupForm.collaborators);
+    const existingTrip = groupTrips.find((trip) => trip.id === editingGroupTripId);
+    const nextTrip = {
+      ...(existingTrip || {}),
+      id: editingGroupTripId || `group-${Date.now()}`,
+      destination: groupForm.destination.trim(),
+      startDate: groupForm.startDate,
+      endDate: groupForm.endDate,
+      budget: groupForm.budget,
+      estimatedCost: groupForm.estimatedCost,
+      notes: groupForm.notes.trim(),
+      collaboratorEmails,
+      ownerUid: existingTrip?.ownerUid || user?.uid,
+      ownerName: existingTrip?.ownerName || displayName,
+      ownerEmail: existingTrip?.ownerEmail || user?.email || "",
+      createdAt: existingTrip?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isGroupPlan: true,
+    };
+
+    const saved = await saveGroupTripToDb(nextTrip);
+    if (!saved) return;
+
+    setStatus(editingGroupTripId ? "Group travel plan updated." : "Group travel plan created.");
+    setShareMessage(
+      collaboratorEmails.length
+        ? "Invited collaborators can edit this plan from their dashboard when they sign in with that email."
+        : "Group plan saved. Add collaborator emails when you are ready to share it."
+    );
+    resetGroupForm();
+  };
+
   const onEdit = (trip) => {
     setEditingTripId(trip.id);
     setForm({
@@ -197,11 +309,119 @@ function Dashboard() {
     });
   };
 
+  const onEditGroupTrip = (trip) => {
+    setEditingGroupTripId(trip.id);
+    setGroupForm({
+      destination: trip.destination || "",
+      startDate: trip.startDate || "",
+      endDate: trip.endDate || "",
+      budget: trip.budget || "",
+      estimatedCost: trip.estimatedCost || "",
+      collaborators: formatCollaboratorEmails(trip.collaboratorEmails),
+      notes: trip.notes || "",
+    });
+  };
+
   const onDelete = (tripId) => {
     const nextTrips = trips.filter((trip) => trip.id !== tripId);
     saveTripsToDb(nextTrips);
     if (editingTripId === tripId) resetForm();
     setStatus("Trip deleted.");
+  };
+
+  const onDeleteGroupTrip = async (trip) => {
+    const result = await deleteSharedTrip(user, trip);
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setSharedTrips((prev) => prev.filter((entry) => entry.id !== trip.id));
+    if (editingGroupTripId === trip.id) resetGroupForm();
+    setStatus("Group travel plan deleted.");
+  };
+
+  const onShareGroupTrip = async (trip) => {
+    const collaborators = formatCollaboratorEmails(trip.collaboratorEmails);
+    const shareText = `Join my ${trip.destination} travel plan. Sign in with your invited email${
+      collaborators ? ` (${collaborators})` : ""
+    } and open the dashboard to edit it.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${trip.destination} travel plan`, text: shareText });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      }
+      setShareMessage("Share invitation ready.");
+    } catch (_) {
+      setShareMessage(shareText);
+    }
+  };
+
+  const exportTripsToPdf = (title, plans) => {
+    const printablePlans = plans.filter(Boolean);
+    if (printablePlans.length === 0) {
+      setStatus("Add an itinerary before exporting.");
+      return;
+    }
+
+    const rows = printablePlans
+      .map(
+        (trip) => `
+          <section class="trip">
+            <h2>${escapeHtml(trip.destination)}</h2>
+            <p><strong>Dates:</strong> ${escapeHtml(trip.startDate || "-")}${
+          trip.endDate ? ` to ${escapeHtml(trip.endDate)}` : ""
+        }</p>
+            <p><strong>Budget:</strong> ${escapeHtml(money(trip.budget))}</p>
+            <p><strong>Estimated cost:</strong> ${escapeHtml(money(trip.estimatedCost))}</p>
+            ${
+              trip.isGroupPlan
+                ? `<p><strong>Collaborators:</strong> ${escapeHtml(formatCollaboratorEmails(trip.collaboratorEmails) || "Owner only")}</p>`
+                : ""
+            }
+            ${trip.notes ? `<p><strong>Notes:</strong> ${escapeHtml(trip.notes)}</p>` : ""}
+          </section>`
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+      setStatus("Allow pop-ups to export the itinerary as PDF.");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>${escapeHtml(title)}</title>
+          <style>
+            body { color: #102047; font-family: Arial, sans-serif; margin: 32px; }
+            header { border-bottom: 2px solid #1b67ff; margin-bottom: 20px; padding-bottom: 12px; }
+            h1 { margin: 0 0 6px; }
+            .trip { border: 1px solid #c9d7f0; border-radius: 8px; margin: 0 0 14px; padding: 14px; page-break-inside: avoid; }
+            .trip h2 { margin: 0 0 8px; }
+            .trip p { margin: 6px 0; }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>${escapeHtml(title)}</h1>
+            <p>Exported for ${escapeHtml(displayName)} on ${new Date().toLocaleDateString()}</p>
+          </header>
+          ${rows}
+          <script>
+            window.onload = function () {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setStatus("PDF export opened. Choose Save as PDF in the print dialog.");
   };
 
   const onPlanWishlist = (item) => {
@@ -224,6 +444,9 @@ function Dashboard() {
           <Link to="/">Home</Link>
           <Link to="/destinations">Destinations</Link>
           <Link to="/profile">Profile</Link>
+          <button type="button" onClick={() => exportTripsToPdf("My Travel Itinerary", [...itineraryTrips, ...groupTrips])}>
+            Export All To PDF
+          </button>
         </nav>
       </header>
 
@@ -239,6 +462,10 @@ function Dashboard() {
         <article>
           <h3>{completedTrips.length}</h3>
           <p>Completed Trips</p>
+        </article>
+        <article>
+          <h3>{groupTrips.length}</h3>
+          <p>Group Plans</p>
         </article>
         <article>
           <h3>{notifications.length}</h3>
@@ -323,6 +550,111 @@ function Dashboard() {
       </section>
 
       <section className="dashboard-card">
+        <div className="dashboard-section-heading">
+          <div>
+            <h2>{editingGroupTripId ? "Edit Group Travel Plan" : "Create Group Travel Plan"}</h2>
+            <p>Invite friends by email so everyone can edit the same itinerary from their dashboard.</p>
+          </div>
+        </div>
+        <form onSubmit={onGroupSubmit} className="dashboard-form dashboard-group-form">
+          <input
+            name="destination"
+            value={groupForm.destination}
+            onChange={onGroupChange}
+            placeholder="Group destination"
+            required
+          />
+          <input name="startDate" type="date" value={groupForm.startDate} onChange={onGroupChange} required />
+          <input name="endDate" type="date" value={groupForm.endDate} onChange={onGroupChange} />
+          <input
+            name="budget"
+            type="number"
+            min="0"
+            value={groupForm.budget}
+            onChange={onGroupChange}
+            placeholder="Shared Budget (USD)"
+          />
+          <input
+            name="estimatedCost"
+            type="number"
+            min="0"
+            value={groupForm.estimatedCost}
+            onChange={onGroupChange}
+            placeholder="Estimated Cost (USD)"
+          />
+          <input
+            name="collaborators"
+            value={groupForm.collaborators}
+            onChange={onGroupChange}
+            placeholder="Friend emails separated by commas"
+          />
+          <textarea
+            name="notes"
+            value={groupForm.notes}
+            onChange={onGroupChange}
+            rows={3}
+            placeholder="Shared itinerary notes"
+          />
+          <div className="dashboard-form-actions">
+            <button type="submit">{editingGroupTripId ? "Update Group Plan" : "Create Group Plan"}</button>
+            {editingGroupTripId && (
+              <button type="button" className="secondary" onClick={resetGroupForm}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+        {shareMessage && <p className="dashboard-share-message">{shareMessage}</p>}
+      </section>
+
+      <section className="dashboard-card">
+        <h2>Group Travel Plans ({groupTrips.length})</h2>
+        {groupTrips.length === 0 ? (
+          <p className="dashboard-empty">No shared group plans yet.</p>
+        ) : (
+          <div className="dashboard-trip-list">
+            {groupTrips.map((trip) => {
+              const isOwner = trip.ownerUid === user?.uid;
+              return (
+                <article key={trip.id} className="dashboard-trip-item">
+                  <h3>{trip.destination}</h3>
+                  <p>
+                    {trip.startDate}
+                    {trip.endDate ? ` to ${trip.endDate}` : ""}
+                  </p>
+                  <p>Owner: {trip.ownerName || trip.ownerEmail || "Trip owner"}</p>
+                  <p>Collaborators: {formatCollaboratorEmails(trip.collaboratorEmails) || "Owner only"}</p>
+                  <p>Budget: ${trip.budget || 0}</p>
+                  <p>Estimated: ${trip.estimatedCost || 0}</p>
+                  {trip.notes && <p>Notes: {trip.notes}</p>}
+                  <div className="dashboard-trip-actions">
+                    <button type="button" className="secondary" onClick={() => onEditGroupTrip(trip)}>
+                      Edit
+                    </button>
+                    <button type="button" className="secondary" onClick={() => onShareGroupTrip(trip)}>
+                      Share
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => exportTripsToPdf(`${trip.destination} Itinerary`, [trip])}
+                    >
+                      Export PDF
+                    </button>
+                    {isOwner && (
+                      <button type="button" className="danger" onClick={() => onDeleteGroupTrip(trip)}>
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="dashboard-card">
         <h2>Upcoming Trips ({upcomingTrips.length})</h2>
         {upcomingTrips.length === 0 ? (
           <p className="dashboard-empty">No upcoming trips yet.</p>
@@ -341,6 +673,13 @@ function Dashboard() {
                 <div className="dashboard-trip-actions">
                   <button type="button" className="secondary" onClick={() => onEdit(trip)}>
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => exportTripsToPdf(`${trip.destination} Itinerary`, [trip])}
+                  >
+                    Export PDF
                   </button>
                   <button type="button" className="danger" onClick={() => onDelete(trip.id)}>
                     Delete
@@ -372,6 +711,13 @@ function Dashboard() {
                   <button type="button" className="secondary" onClick={() => onEdit(trip)}>
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => exportTripsToPdf(`${trip.destination} Itinerary`, [trip])}
+                  >
+                    Export PDF
+                  </button>
                   <button type="button" className="danger" onClick={() => onDelete(trip.id)}>
                     Delete
                   </button>
@@ -401,6 +747,13 @@ function Dashboard() {
                 <div className="dashboard-trip-actions">
                   <button type="button" className="secondary" onClick={() => onEdit(trip)}>
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => exportTripsToPdf(`${trip.destination} Itinerary`, [trip])}
+                  >
+                    Export PDF
                   </button>
                   <button type="button" className="danger" onClick={() => onDelete(trip.id)}>
                     Delete
