@@ -223,6 +223,7 @@ function Dashboard() {
         <nav className="dashboard-nav">
           <Link to="/">Home</Link>
           <Link to="/destinations">Destinations</Link>
+          <Link to="/transport">Transport</Link>
           <Link to="/profile">Profile</Link>
         </nav>
       </header>

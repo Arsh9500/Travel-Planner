@@ -228,6 +228,33 @@ function Home() {
               </button>
             </div>
           </div>
+
+          <div className="home-card home-card-transport">
+            <div
+              className="home-card-image"
+              style={{
+                backgroundImage:
+                  "url(https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=700&auto=format&fit=crop)",
+              }}
+            />
+            <div className="home-card-body">
+              <h3>Transport Planning</h3>
+              <p>
+                Get smart transport suggestions for trains, rideshares, taxis, and shuttles with estimated travel time and budget guidance.
+              </p>
+              <button
+                type="button"
+                className="home-card-cta"
+                onClick={() =>
+                  user
+                    ? navigate("/transport")
+                    : navigate("/register", { state: { from: "/transport" } })
+                }
+              >
+                Plan transport
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
