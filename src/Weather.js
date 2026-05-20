@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useItinerary } from "./context/ItineraryContext";
-import { requestGeminiReply } from "./services/geminiService";
 import { requestPlacesReply, buildPlaceMapLink } from "./services/placesService";
 import WeatherAISuggestions from "./components/WeatherAISuggestions";
 import "./Weather.css";
@@ -112,41 +111,6 @@ function getWeatherRecommendation(result) {
       "Carry essentials like water and snacks",
       "Be prepared for weather changes"
     ]
-  };
-}
-
-function extractStructuredAiSuggestions(rawText) {
-  if (!rawText || typeof rawText !== "string") {
-    return { activities: [], tips: [] };
-  }
-
-  const lines = rawText
-    .split(/\r?\n/) 
-    .map((l) => l.trim().replace(/^[-*\s]+/, ""))
-    .filter(Boolean);
-
-  const activities = [];
-  const tips = [];
-
-  lines.forEach((line) => {
-    const lower = line.toLowerCase();
-    if (lower.includes("tip") || lower.includes("sunscreen") || lower.includes("umbrella") || lower.includes("weather")) {
-      if (tips.length < 5) tips.push(line);
-    } else if (activities.length < 5) {
-      activities.push(line);
-    }
-  });
-
-  if (activities.length < 3) {
-    const fallback = lines.slice(0, 5);
-    fallback.forEach((item) => {
-      if (!activities.includes(item) && activities.length < 5) activities.push(item);
-    });
-  }
-
-  return {
-    activities: activities.slice(0, 5),
-    tips: tips.slice(0, 4),
   };
 }
 
@@ -276,12 +240,6 @@ function Weather() {
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastError, setForecastError] = useState("");
 
-  const [aiSuggestion, setAiSuggestion] = useState("");
-  const [aiActivityList, setAiActivityList] = useState([]);
-  const [aiTravelTips, setAiTravelTips] = useState([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState("");
-
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState("");
@@ -301,10 +259,6 @@ function Weather() {
     setForecast([]);
     setTodayForecast([]);
     setForecastError("");
-    setAiSuggestion("");
-    setAiActivityList([]);
-    setAiTravelTips([]);
-    setAiError("");
     setPlaceSuggestions([]);
     setPlacesError("");
     setPlacesNotice("");
@@ -382,27 +336,6 @@ function Weather() {
     const city = result.name || location;
     const weatherDesc = result.weather?.[0]?.description || "weather";
     const temp = Math.round(result.main?.temp || 0);
-
-    const message = `You are a local travel planner. It is currently ${temp}°C with ${weatherDesc} in ${city}. Give 3-5 specific, realistic things to do based on this weather and 3 practical short tips in bullet form.`;
-
-    setAiLoading(true);
-    setAiError("");
-    setAiSuggestion("");
-    setAiActivityList([]);
-    setAiTravelTips([]);
-
-    requestGeminiReply({ message, context: { location: city, weather: weatherDesc, temp } })
-      .then((data) => {
-        const reply = data.reply || "";
-        setAiSuggestion(reply);
-        const structured = extractStructuredAiSuggestions(reply);
-        setAiActivityList(structured.activities);
-        setAiTravelTips(structured.tips);
-      })
-      .catch((err) => {
-        setAiError(err.message || "Unable to get AI suggestions right now.");
-      })
-      .finally(() => setAiLoading(false));
 
     setPlacesLoading(true);
     setPlacesError("");
@@ -509,38 +442,6 @@ function Weather() {
             <div className="weather-recommendation">
               <h4>{weatherRecommendation.title}</h4>
               <p>{weatherRecommendation.tip}</p>
-            </div>
-
-            <div className="weather-ai">
-              <h4>AI activity ideas</h4>
-              {aiLoading && <p>Thinking... (using AI to suggest activities)</p>}
-              {aiError && <p className="weather-error">{aiError}</p>}
-
-              {!aiLoading && !aiError && aiActivityList.length > 0 && (
-                <>
-                  <h5>AI-generated recommended activities:</h5>
-                  <ul>
-                    {aiActivityList.slice(0, 5).map((activity, index) => (
-                      <li key={`ai-act-${index}`}>{activity}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-
-              {!aiLoading && !aiError && aiTravelTips.length > 0 && (
-                <>
-                  <h5>AI-generated travel tips:</h5>
-                  <ul>
-                    {aiTravelTips.slice(0, 4).map((tip, index) => (
-                      <li key={`ai-tip-${index}`}>{tip}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-
-              {!aiLoading && !aiError && !aiActivityList.length && aiSuggestion && (
-                <p>{aiSuggestion}</p>
-              )}
             </div>
 
             <div className="weather-places">
