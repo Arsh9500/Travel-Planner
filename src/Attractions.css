@@ -1,0 +1,417 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap");
+
+.attractions-page {
+  min-height: 100vh;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(0, 178, 166, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 16%, rgba(255, 183, 77, 0.16), transparent 30%),
+    linear-gradient(150deg, #f8fbff 0%, #eef6fb 54%, #f2fbf7 100%);
+  color: #0c1635;
+}
+
+.attractions-nav {
+  background: linear-gradient(90deg, rgba(15, 23, 52, 0.94), rgba(12, 64, 90, 0.92));
+  color: #fff;
+  padding: 14px 24px;
+  box-shadow: 0 14px 34px rgba(9, 24, 56, 0.18);
+}
+
+.attractions-nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.attractions-logo {
+  font-size: 1.25rem;
+}
+
+.attractions-nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.attractions-nav-links a {
+  color: rgba(255, 255, 255, 0.94);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.attractions-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 34px 24px 44px;
+}
+
+.attractions-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.attractions-eyebrow {
+  margin: 0 0 7px;
+  color: #0f7f79;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attractions-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.7rem);
+  color: #0c1635;
+}
+
+.attractions-heading p {
+  margin: 8px 0 0;
+  max-width: 680px;
+  color: #2b3f71;
+  line-height: 1.6;
+}
+
+.attractions-count {
+  min-width: 150px;
+  border: 1px solid rgba(33, 62, 118, 0.13);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 14px 16px;
+  box-shadow: 0 18px 38px rgba(17, 43, 94, 0.11);
+}
+
+.attractions-count strong,
+.attractions-count span {
+  display: block;
+}
+
+.attractions-count strong {
+  font-size: 1.8rem;
+}
+
+.attractions-count span {
+  color: #536ca3;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.attractions-tools {
+  display: grid;
+  grid-template-columns: 1.5fr minmax(220px, 0.6fr);
+  gap: 12px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(29, 74, 152, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 16px;
+  box-shadow: 0 22px 46px rgba(17, 42, 95, 0.13);
+}
+
+.attractions-tools label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #2b3f71;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.attractions-tools input,
+.attractions-tools select {
+  width: 100%;
+  border: 1px solid #b6c8e9;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0c1635;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  outline: none;
+}
+
+.attractions-tools input:focus,
+.attractions-tools select:focus {
+  border-color: #1b67ff;
+  box-shadow: 0 0 0 4px rgba(27, 103, 255, 0.14);
+}
+
+.attractions-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.attractions-list {
+  display: grid;
+  gap: 16px;
+}
+
+.attraction-card {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(33, 62, 118, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 38px rgba(17, 43, 94, 0.12);
+}
+
+.attraction-card.is-active {
+  border-color: rgba(27, 103, 255, 0.52);
+  box-shadow: 0 20px 44px rgba(27, 103, 255, 0.16);
+}
+
+.attraction-image-button {
+  display: block;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: #dce8f5;
+}
+
+.attraction-image-button img,
+.attraction-detail > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.attraction-card-body {
+  padding: 16px;
+}
+
+.attraction-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.attraction-card-title p {
+  margin: 0 0 5px;
+  color: #0f7f79;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.attraction-card-title h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  color: #0c1635;
+}
+
+.attraction-card-title span {
+  border-radius: 8px;
+  background: #fff7df;
+  color: #875600;
+  padding: 7px 9px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.attraction-location {
+  margin: 8px 0;
+  color: #2b3f71;
+  font-weight: 700;
+}
+
+.attraction-description {
+  margin: 0 0 14px;
+  color: #536ca3;
+  line-height: 1.5;
+}
+
+.attraction-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attraction-card-actions button,
+.saved-attractions button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 13px;
+  background: linear-gradient(120deg, #1b67ff, #00b2a6);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.attraction-card-actions .favorite-button {
+  background: linear-gradient(120deg, #2d3f72, #4f6cac);
+}
+
+.attraction-card-actions .favorite-button.is-saved {
+  background: linear-gradient(120deg, #198754, #2caa73);
+}
+
+.attractions-empty {
+  margin: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 18px;
+  color: #2b3f71;
+  font-weight: 700;
+}
+
+.attraction-detail {
+  position: sticky;
+  top: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(33, 62, 118, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 54px rgba(17, 43, 94, 0.16);
+}
+
+.attraction-detail > img {
+  height: 245px;
+}
+
+.attraction-detail-body {
+  padding: 18px;
+}
+
+.attraction-detail-body h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.attraction-detail-body > p:not(.attractions-eyebrow):not(.attraction-location) {
+  margin: 0 0 16px;
+  color: #2b3f71;
+  line-height: 1.6;
+}
+
+.rating-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(33, 62, 118, 0.12);
+  border-bottom: 1px solid rgba(33, 62, 118, 0.12);
+  padding: 12px 0;
+  margin-bottom: 14px;
+}
+
+.rating-row strong {
+  color: #875600;
+}
+
+.rating-row span {
+  color: #536ca3;
+  font-weight: 700;
+}
+
+.highlight-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.highlight-list span {
+  border: 1px solid rgba(15, 127, 121, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 178, 166, 0.1);
+  color: #0f615d;
+  padding: 7px 10px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.review-panel,
+.map-panel {
+  margin-top: 16px;
+}
+
+.review-panel h3,
+.map-panel h3,
+.saved-attractions h2 {
+  margin: 0 0 10px;
+  color: #0c1635;
+  font-size: 1.08rem;
+}
+
+.review-panel blockquote {
+  margin: 0 0 9px;
+  border-left: 3px solid #00b2a6;
+  background: rgba(232, 247, 244, 0.75);
+  padding: 10px 12px;
+  color: #2b3f71;
+  line-height: 1.5;
+}
+
+.map-panel iframe {
+  width: 100%;
+  height: 230px;
+  border: 0;
+  border-radius: 8px;
+  background: #dce8f5;
+}
+
+.saved-attractions {
+  margin-top: 22px;
+  border: 1px solid rgba(33, 62, 118, 0.13);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 16px;
+}
+
+.saved-attractions div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 940px) {
+  .attractions-heading,
+  .attractions-nav-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .attractions-layout,
+  .attractions-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .attraction-detail {
+    position: static;
+  }
+}
+
+@media (max-width: 620px) {
+  .attractions-main {
+    padding: 26px 16px 34px;
+  }
+
+  .attraction-card {
+    grid-template-columns: 1fr;
+  }
+
+  .attraction-image-button img {
+    height: 190px;
+  }
+
+  .attraction-card-actions {
+    flex-direction: column;
+  }
+}

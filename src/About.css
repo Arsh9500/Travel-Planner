@@ -3,12 +3,18 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(0, 178, 166, 0.1), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, #f0f6fb 100%);
+  perspective: 1100px;
 }
 
 .about-nav {
-  background: #1a1a2e;
+  background: rgba(16, 21, 44, 0.9);
   color: #fff;
   padding: 14px 24px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 32px rgba(10, 20, 42, 0.18);
 }
 
 .about-nav-inner {
@@ -88,8 +94,17 @@
 .about-founder {
   text-align: center;
   padding: 24px 16px;
-  background: #f8f8fa;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(225, 233, 244, 0.86);
   border-radius: 12px;
+  box-shadow: 0 18px 38px rgba(15, 35, 70, 0.1);
+  transform-style: preserve-3d;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.about-founder:hover {
+  transform: translateY(-7px) rotateX(4deg) translateZ(14px);
+  box-shadow: 0 30px 58px rgba(15, 35, 70, 0.16);
 }
 
 .about-founder img {
@@ -98,6 +113,7 @@
   border-radius: 50%;
   object-fit: cover;
   margin-bottom: 12px;
+  box-shadow: 0 14px 28px rgba(20, 35, 68, 0.18);
 }
 
 .about-founder h3 {
@@ -142,7 +158,9 @@
 
 /* Get in Touch - blue section */
 .about-get-in-touch {
-  background: #2563eb;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(255, 183, 77, 0.24), transparent 28%),
+    linear-gradient(135deg, #175cd3 0%, #0f766e 100%);
   color: #fff;
   padding: 48px 24px;
   margin-top: auto;
@@ -208,11 +226,14 @@
 }
 
 .get-in-touch-form-card {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.92);
   color: #1a1a2e;
   padding: 28px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 28px 62px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  transform: rotateY(-2deg) translateZ(0);
 }
 
 .get-in-touch-form-card h3 {

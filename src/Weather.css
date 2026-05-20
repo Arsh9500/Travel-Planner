@@ -5,6 +5,7 @@
   align-items: flex-start;
   justify-content: center;
   transition: background 0.3s ease;
+  perspective: 1100px;
 }
 
 .weather-page {
@@ -17,8 +18,10 @@
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 22px;
-  box-shadow: 0 18px 45px rgba(8, 47, 73, 0.18);
+  box-shadow: 0 32px 76px rgba(8, 47, 73, 0.22);
   backdrop-filter: blur(10px);
+  transform-style: preserve-3d;
+  animation: weatherFloatIn 420ms ease-out both;
 }
 
 .weather-header {
@@ -156,9 +159,10 @@
   padding: 1.4rem;
   border-radius: 18px;
   border: 1px solid rgba(160, 196, 228, 0.45);
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 20px 46px rgba(37, 99, 235, 0.16);
   text-align: left;
   animation: fadeIn 0.4s ease-in;
+  transform-style: preserve-3d;
 }
 
 .weather-result-header {
@@ -308,7 +312,13 @@
   border-radius: 14px;
   padding: 0.85rem;
   text-align: left;
-  box-shadow: 0 6px 14px rgba(14, 86, 172, 0.1);
+  box-shadow: 0 14px 28px rgba(14, 86, 172, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weather-place-item:hover {
+  transform: translateY(-5px) rotateX(3deg) translateZ(10px);
+  box-shadow: 0 24px 48px rgba(14, 86, 172, 0.18);
 }
 
 .place-name {
@@ -387,6 +397,13 @@
   border-radius: 12px;
   padding: 0.75rem;
   text-align: center;
+  box-shadow: 0 10px 22px rgba(14, 86, 172, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.weather-forecast-item:hover {
+  transform: translateY(-4px) translateZ(8px);
+  box-shadow: 0 18px 36px rgba(14, 86, 172, 0.13);
 }
 
 .forecast-day {
@@ -415,6 +432,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes weatherFloatIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) rotateX(3deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
   }
 }
 

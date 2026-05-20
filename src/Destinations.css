@@ -17,16 +17,20 @@
   display: flex;
   flex-direction: column;
   background:
+    radial-gradient(circle at 48% 4%, rgba(255, 183, 77, 0.16) 0%, transparent 30%),
     radial-gradient(circle at 15% 8%, rgba(198, 224, 255, 0.9) 0%, transparent 42%),
     radial-gradient(circle at 88% 16%, rgba(172, 244, 230, 0.72) 0%, transparent 34%),
     linear-gradient(160deg, #f7fbff 0%, #edf4ff 50%, #e8f5ff 100%);
+  perspective: 1200px;
 }
 
 .destinations-nav {
-  background: linear-gradient(90deg, #0f1734 0%, #111e44 48%, #0f2b5f 100%);
+  background: linear-gradient(90deg, rgba(15, 23, 52, 0.94) 0%, rgba(17, 30, 68, 0.92) 48%, rgba(12, 64, 90, 0.92) 100%);
   color: var(--white);
   padding: 14px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(9, 24, 56, 0.18);
 }
 
 .destinations-nav-inner {
@@ -78,9 +82,10 @@
   border: 1px solid rgba(29, 74, 152, 0.14);
   border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 18px 35px rgba(17, 42, 95, 0.11);
+  box-shadow: 0 26px 52px rgba(17, 42, 95, 0.14);
   backdrop-filter: blur(8px);
   margin-bottom: 16px;
+  transform-style: preserve-3d;
 }
 
 .popular-section {
@@ -219,7 +224,7 @@
   border-radius: 22px;
   border: 1px solid rgba(29, 74, 152, 0.14);
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 20px 40px rgba(17, 43, 94, 0.12);
+  box-shadow: 0 28px 58px rgba(17, 43, 94, 0.15);
   backdrop-filter: blur(10px);
 }
 
@@ -329,6 +334,35 @@
 .hotel-payment-fields small {
   color: #c0392b;
   font-size: 0.8rem;
+}
+
+.crypto-wallet-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(27, 103, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(231, 241, 255, 0.72);
+}
+
+.crypto-wallet-panel p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.wallet-status {
+  margin: 10px 0 0;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.crypto-payment-error {
+  display: block;
+  margin-top: 8px;
+  color: #c0392b;
+  font-weight: 700;
 }
 
 .payment-methods {
@@ -475,17 +509,20 @@
   background: var(--surface);
   border: 1px solid var(--line);
   backdrop-filter: blur(8px);
-  box-shadow: 0 14px 34px rgba(17, 43, 94, 0.12);
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  box-shadow: 0 18px 38px rgba(17, 43, 94, 0.13);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 
 .dest-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 22px 40px rgba(17, 43, 94, 0.2);
+  transform: translateY(-8px) rotateX(4deg) rotateY(-3deg) translateZ(14px);
+  border-color: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 32px 66px rgba(17, 43, 94, 0.21);
 }
 .dest-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 10px 28px rgba(15,23,42,0.15);
+  transform: translateY(-8px) rotateX(4deg) rotateY(-3deg) scale(1.01) translateZ(14px);
+  box-shadow: 0 32px 66px rgba(17, 43, 94, 0.21);
 }
 
 .dest-card-image {
@@ -493,6 +530,7 @@
   background-size: cover;
   background-position: center;
   position: relative;
+  transform: translateZ(16px);
 }
 
 .dest-card-image::after {
@@ -650,6 +688,10 @@
   }
 
   .hotel-booking-header {
+    flex-direction: column;
+  }
+
+  .crypto-wallet-panel {
     flex-direction: column;
   }
 }

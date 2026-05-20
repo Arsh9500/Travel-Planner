@@ -130,3 +130,69 @@
 .planner-smart-weather h3 {
   margin: 14px 0 8px;
 }
+
+.planner-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.planner-attraction-popup {
+  width: min(560px, 100%);
+  max-height: min(720px, 88vh);
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  padding: 18px;
+}
+
+.planner-popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.planner-popup-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.planner-popup-header button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: none;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planner-attraction-list {
+  display: grid;
+  gap: 10px;
+}
+
+.planner-attraction-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.planner-attraction-item h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.planner-attraction-item p {
+  margin: 0;
+  color: #334155;
+}

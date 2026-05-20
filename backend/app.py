@@ -1,8 +1,12 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+import json
 import requests as http_req
+import os
 from pathlib import Path
+import time
+import uuid
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.neighbors import NearestNeighbors
@@ -15,6 +19,10 @@ from places_service import search_places
 
 ROOT_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(ROOT_ENV_PATH, override=True)
+
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b")
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "180"))
 
 
 app = Flask(__name__)
@@ -239,6 +247,118 @@ def score_hotel_row(row, payload, distance, past_choice_profile):
     )
 
 
+def parse_attraction_response(raw_response):
+    if not raw_response:
+        return []
+
+    try:
+        parsed = json.loads(raw_response)
+    except json.JSONDecodeError:
+        start = raw_response.find("[")
+        end = raw_response.rfind("]")
+        if start == -1 or end == -1 or end <= start:
+            return [
+                {"name": line.strip("-* 1234567890. "), "reason": ""}
+                for line in raw_response.splitlines()
+                if line.strip()
+            ][:5]
+        try:
+            parsed = json.loads(raw_response[start : end + 1])
+        except json.JSONDecodeError:
+            return []
+
+    if isinstance(parsed, dict):
+        parsed = parsed.get("attractions", [])
+
+    attractions = []
+    for item in parsed[:5] if isinstance(parsed, list) else []:
+        if isinstance(item, str):
+            attractions.append({"name": item, "reason": ""})
+        elif isinstance(item, dict) and item.get("name"):
+            attractions.append(
+                {
+                    "name": str(item.get("name", "")).strip(),
+                    "reason": str(item.get("reason", "")).strip(),
+                }
+            )
+
+    return attractions
+
+
+def normalize_card_number(value):
+    return "".join(char for char in str(value or "") if char.isdigit())[:19]
+
+
+def validate_payment_payload(payload):
+    required = ["amount", "currency", "paymentMethod", "booking"]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return f"Missing required fields: {', '.join(missing)}"
+
+    try:
+        amount = float(payload["amount"])
+    except (TypeError, ValueError):
+        return "amount must be numeric"
+
+    if amount <= 0:
+        return "amount must be greater than 0"
+
+    payment_method = payload.get("paymentMethod")
+    if payment_method not in {"Credit Card", "Debit Card", "Pay at Hotel"}:
+        return "paymentMethod must be Credit Card, Debit Card, or Pay at Hotel"
+
+    booking = payload.get("booking") or {}
+    for field in ["hotelName", "destination", "checkInDate", "checkOutDate", "guests"]:
+        if not booking.get(field):
+            return f"booking.{field} is required"
+
+    if payment_method == "Pay at Hotel":
+        return None
+
+    payment_details = payload.get("paymentDetails") or {}
+    card_number = normalize_card_number(payment_details.get("cardNumber"))
+    if len(card_number) < 13:
+        return "A valid card number is required"
+    if not str(payment_details.get("cardholderName") or "").strip():
+        return "cardholderName is required"
+    if not str(payment_details.get("expiryDate") or "").strip():
+        return "expiryDate is required"
+    if not str(payment_details.get("cvv") or "").isdigit():
+        return "cvv is required"
+
+    return None
+
+
+def validate_crypto_confirmation_payload(payload):
+    required = ["txHash", "walletAddress", "chainId", "amount", "currency", "booking"]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return f"Missing required fields: {', '.join(missing)}"
+
+    tx_hash = str(payload.get("txHash") or "")
+    wallet_address = str(payload.get("walletAddress") or "")
+
+    if not tx_hash.startswith("0x") or len(tx_hash) < 12:
+        return "A valid transaction hash is required"
+    if not wallet_address.startswith("0x") or len(wallet_address) != 42:
+        return "A valid wallet address is required"
+
+    try:
+        amount = float(payload["amount"])
+    except (TypeError, ValueError):
+        return "amount must be numeric"
+
+    if amount <= 0:
+        return "amount must be greater than 0"
+
+    booking = payload.get("booking") or {}
+    for field in ["hotelName", "destination", "checkInDate", "checkOutDate", "guests"]:
+        if not booking.get(field):
+            return f"booking.{field} is required"
+
+    return None
+
+
 @app.get("/")
 def health_check():
     return jsonify({"message": "Travel Planner ML API is running."})
@@ -301,6 +421,54 @@ def recommend_hotels():
             "message": "Hotels ranked from best to least suitable.",
         }
     )
+
+
+@app.post("/recommend-attractions")
+def recommend_attractions():
+    payload = request.get_json(silent=True) or {}
+    destination = (payload.get("destination") or "").strip()
+    preferences = payload.get("preferences") or {}
+
+    if not destination:
+        return jsonify({"error": "destination is required"}), 400
+
+    preference_text = ", ".join(
+        str(value).strip()
+        for value in preferences.values()
+        if value is not None and str(value).strip()
+    )
+
+    prompt = (
+        "Recommend 5 tourist attractions for a travel itinerary. "
+        "Use the destination and preferences to personalize the list. "
+        "Return only valid JSON as an array of objects with name and reason fields. "
+        f"Destination: {destination}. "
+        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}."
+    )
+
+    try:
+        ollama_resp = http_req.post(
+            OLLAMA_API_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
+        ollama_resp.raise_for_status()
+        raw_response = ollama_resp.json().get("response", "")
+        attractions = parse_attraction_response(raw_response)
+        return jsonify({"attractions": attractions, "raw": raw_response})
+    except http_req.exceptions.ConnectionError:
+        return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except http_req.exceptions.ReadTimeout:
+        return jsonify(
+            {
+                "error": (
+                    f"Ollama took longer than {OLLAMA_TIMEOUT_SECONDS} seconds to respond. "
+                    "Try again after the model finishes loading, or use a smaller model."
+                )
+            }
+        ), 504
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.post("/chat/gemini")
@@ -386,6 +554,76 @@ def chat_message():
     return jsonify(result)
 
 
+@app.post("/payments/process")
+def process_payment():
+    payload = request.get_json(silent=True) or {}
+    validation_error = validate_payment_payload(payload)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+
+    payment_method = payload["paymentMethod"]
+    amount = round(float(payload["amount"]), 2)
+    currency = str(payload.get("currency") or "USD").upper()
+    payment_details = payload.get("paymentDetails") or {}
+    card_last4 = ""
+
+    # Simulate a gateway handoff. In production, replace this with Stripe/Adyen/etc.
+    # Never store full card numbers or CVV in this app's database.
+    if payment_method != "Pay at Hotel":
+        card_last4 = normalize_card_number(payment_details.get("cardNumber"))[-4:]
+        time.sleep(0.4)
+
+    transaction_id = f"PAY-{uuid.uuid4().hex[:12].upper()}"
+    booking_reference = f"HB-{uuid.uuid4().hex[:10].upper()}"
+
+    return jsonify(
+        {
+            "ok": True,
+            "transactionId": transaction_id,
+            "bookingReference": booking_reference,
+            "amount": amount,
+            "currency": currency,
+            "paymentMethod": payment_method,
+            "paymentStatus": "Pending" if payment_method == "Pay at Hotel" else "Paid",
+            "bookingStatus": "Confirmed",
+            "cardLast4": card_last4,
+            "gatewayMode": "mock-secure",
+        }
+    )
+
+
+@app.post("/payments/crypto/confirm")
+def confirm_crypto_payment():
+    payload = request.get_json(silent=True) or {}
+    validation_error = validate_crypto_confirmation_payload(payload)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+
+    amount = round(float(payload["amount"]), 2)
+    currency = str(payload.get("currency") or "USD").upper()
+    booking_reference = f"HB-BC-{uuid.uuid4().hex[:8].upper()}"
+
+    # This records the wallet transaction metadata for a testnet/demo flow.
+    # A production service should verify the transaction receipt through a trusted RPC provider.
+    return jsonify(
+        {
+            "ok": True,
+            "transactionId": f"CHAIN-{uuid.uuid4().hex[:12].upper()}",
+            "bookingReference": booking_reference,
+            "amount": amount,
+            "currency": currency,
+            "paymentMethod": "Blockchain/Crypto",
+            "paymentStatus": "Confirmed on test network",
+            "bookingStatus": "Confirmed",
+            "txHash": payload["txHash"],
+            "walletAddress": payload["walletAddress"],
+            "chainId": payload["chainId"],
+            "cryptoAmount": payload.get("cryptoAmount") or "",
+            "gatewayMode": "blockchain-testnet",
+        }
+    )
+
+
 @app.post("/weather-ai")
 def weather_ai_suggestions():
     payload = request.get_json(silent=True) or {}
@@ -403,15 +641,24 @@ def weather_ai_suggestions():
 
     try:
         ollama_resp = http_req.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "gemma3:1b", "prompt": prompt, "stream": False},
-            timeout=60,
+            OLLAMA_API_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            timeout=OLLAMA_TIMEOUT_SECONDS,
         )
         ollama_resp.raise_for_status()
         suggestions = ollama_resp.json().get("response", "")
         return jsonify({"suggestions": suggestions})
     except http_req.exceptions.ConnectionError:
         return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except http_req.exceptions.ReadTimeout:
+        return jsonify(
+            {
+                "error": (
+                    f"Ollama took longer than {OLLAMA_TIMEOUT_SECONDS} seconds to respond. "
+                    "Try again after the model finishes loading, or use a smaller model."
+                )
+            }
+        ), 504
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

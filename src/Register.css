@@ -13,9 +13,11 @@
   justify-content: center;
   align-items: center;
   background:
+    radial-gradient(circle at 50% 8%, rgba(255, 183, 77, 0.16), transparent 30%),
     radial-gradient(circle at 16% 16%, rgba(2, 132, 199, 0.2), transparent 36%),
     radial-gradient(circle at 86% 84%, rgba(13, 148, 136, 0.22), transparent 40%),
     linear-gradient(145deg, #f4fafc 0%, #ecf4fa 52%, #e7eff8 100%);
+  perspective: 1100px;
 }
 
 .register-box {
@@ -25,9 +27,16 @@
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(8px);
-  box-shadow: 0 28px 58px rgba(16, 46, 80, 0.16);
+  box-shadow: 0 34px 76px rgba(16, 46, 80, 0.2);
   text-align: left;
   animation: registerRise 360ms ease-out;
+  transform-style: preserve-3d;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.register-box:hover {
+  transform: rotateX(2deg) translateY(-3px) translateZ(12px);
+  box-shadow: 0 42px 86px rgba(16, 46, 80, 0.24);
 }
 
 .back-home {

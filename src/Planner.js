@@ -1,13 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useItinerary } from "./context/ItineraryContext";
-import { destinations } from "./data/destinations";
 import { loadUserTrips, saveUserTrips } from "./utils/trips";
 import "./Planner.css";
 
 const WEATHER_API_BASE = "https://api.openweathermap.org/data/2.5/weather";
-const DEFAULT_WEATHER_API_KEY = "b0de676fca853faaf818b515e2940193"; // demo only
 
 function normalizeDestinationQuery(rawDestination) {
   if (!rawDestination) return "";
@@ -36,6 +34,11 @@ function Planner() {
   const [weatherError, setWeatherError] = useState("");
   const [hotelRecommendations, setHotelRecommendations] = useState([]);
   const [hotelRecommendationsLoading, setHotelRecommendationsLoading] = useState(false);
+  const [attractionRecommendations, setAttractionRecommendations] = useState([]);
+  const [attractionRecommendationsLoading, setAttractionRecommendationsLoading] = useState(false);
+  const [attractionRecommendationsError, setAttractionRecommendationsError] = useState("");
+  const [showAttractionPopup, setShowAttractionPopup] = useState(false);
+  const dismissedAttractionDestinationRef = useRef("");
 
   useEffect(() => {
     let ignore = false;
@@ -119,8 +122,14 @@ function Planner() {
       setWeatherLoading(true);
       setWeatherError("");
 
-      let apiKey = process.env.REACT_APP_WEATHER_API_KEY;
-      if (!apiKey) apiKey = DEFAULT_WEATHER_API_KEY;
+      const apiKey = process.env.REACT_APP_WEATHER_API_KEY;
+
+      if (!apiKey) {
+        setWeatherResult(null);
+        setWeatherError("Weather API key is missing. Please set REACT_APP_WEATHER_API_KEY in .env.");
+        setWeatherLoading(false);
+        return;
+      }
 
       try {
         const response = await fetch(
@@ -190,6 +199,82 @@ function Planner() {
 
     fetchHotels();
   }, [itineraryDestination]);
+
+  useEffect(() => {
+    const destinationQuery = normalizeDestinationQuery(itineraryDestination);
+    if (!destinationQuery) {
+      setAttractionRecommendations([]);
+      setAttractionRecommendationsError("");
+      setAttractionRecommendationsLoading(false);
+      setShowAttractionPopup(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const matchingTrip = [...trips]
+      .reverse()
+      .find((trip) => normalizeDestinationQuery(trip.destination) === destinationQuery);
+
+    const fetchAttractions = async () => {
+      setAttractionRecommendationsLoading(true);
+      setAttractionRecommendationsError("");
+
+      try {
+        const travelApiBase = process.env.REACT_APP_TRAVEL_API_BASE_URL || "http://127.0.0.1:5000";
+        const response = await fetch(`${travelApiBase}/recommend-attractions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destination: destinationQuery,
+            preferences: {
+              budget: matchingTrip?.budget ? `Budget USD ${matchingTrip.budget}` : "",
+              estimatedCost: matchingTrip?.estimatedCost
+                ? `Estimated cost USD ${matchingTrip.estimatedCost}`
+                : "",
+              notes: matchingTrip?.notes || "",
+              dates: matchingTrip?.startDate
+                ? `${matchingTrip.startDate}${matchingTrip.endDate ? ` to ${matchingTrip.endDate}` : ""}`
+                : "",
+            },
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (cancelled) return;
+
+        if (response.ok) {
+          const attractions = data.attractions || [];
+          setAttractionRecommendations(attractions);
+          if (attractions.length > 0 && dismissedAttractionDestinationRef.current !== destinationQuery) {
+            setShowAttractionPopup(true);
+          }
+        } else {
+          setAttractionRecommendations([]);
+          setAttractionRecommendationsError(data.error || "Unable to load attraction recommendations.");
+          if (dismissedAttractionDestinationRef.current !== destinationQuery) {
+            setShowAttractionPopup(true);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAttractionRecommendations([]);
+          setAttractionRecommendationsError(error.message || "Unable to load attraction recommendations.");
+          if (dismissedAttractionDestinationRef.current !== destinationQuery) {
+            setShowAttractionPopup(true);
+          }
+        }
+      } finally {
+        if (!cancelled) setAttractionRecommendationsLoading(false);
+      }
+    };
+
+    fetchAttractions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [itineraryDestination, trips]);
 
   const resetForm = () => {
     setForm({
@@ -275,8 +360,45 @@ function Planner() {
     navigate("/weather", { state: { destination: itineraryDestination } });
   };
 
+  const closeAttractionPopup = () => {
+    dismissedAttractionDestinationRef.current = normalizeDestinationQuery(itineraryDestination);
+    setShowAttractionPopup(false);
+  };
+
   return (
     <div className="planner-page">
+      {showAttractionPopup && (
+        <div className="planner-popup-backdrop" role="presentation">
+          <section className="planner-attraction-popup" role="dialog" aria-modal="true">
+            <div className="planner-popup-header">
+              <h2>Recommended Attractions in {normalizeDestinationQuery(itineraryDestination)}</h2>
+              <button type="button" onClick={closeAttractionPopup} aria-label="Close attraction recommendations">
+                x
+              </button>
+            </div>
+
+            {attractionRecommendationsLoading && (
+              <p className="planner-empty">Finding attractions with Ollama...</p>
+            )}
+
+            {!attractionRecommendationsLoading && attractionRecommendationsError && (
+              <p className="planner-empty">{attractionRecommendationsError}</p>
+            )}
+
+            {!attractionRecommendationsLoading && !attractionRecommendationsError && (
+              <div className="planner-attraction-list">
+                {attractionRecommendations.map((attraction, index) => (
+                  <article key={`${attraction.name}-${index}`} className="planner-attraction-item">
+                    <h3>{attraction.name}</h3>
+                    {attraction.reason && <p>{attraction.reason}</p>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
       <div className="planner-header">
         <h1>Trip Planner</h1>
         <p>Manage your upcoming trips, edit plans, and track alerts.</p>

@@ -25,6 +25,7 @@ function Home() {
       { keywords: ["home", "main"], path: "/", requiresAuth: false },
       { keywords: ["about", "info"], path: "/about", requiresAuth: false },
       { keywords: ["destination", "destinations", "place", "places"], path: "/destinations", requiresAuth: true },
+      { keywords: ["attraction", "attractions", "activity", "activities", "landmark"], path: "/attractions", requiresAuth: true },
       { keywords: ["hotel", "hotels", "stay", "booking"], path: "/hotels", requiresAuth: true },
       { keywords: ["planner", "plan", "itinerary"], path: "/planner", requiresAuth: true },
       { keywords: ["budget", "cost", "expense"], path: "/budget", requiresAuth: true },
@@ -79,6 +80,7 @@ function Home() {
           <nav className="nav">
             <Link to="/">Home</Link>
             <Link to="/destinations">Destinations</Link>
+            {user && <Link to="/attractions">Attractions</Link>}
             {user && <Link to="/profile">Profile</Link>}
             {user?.role === "admin" && <Link to="/admin">Admin</Link>}
             <Link to="/about">About</Link>
@@ -225,6 +227,34 @@ function Home() {
                 }
               >
                 Check weather
+              </button>
+            </div>
+          </div>
+
+          <div className="home-card home-card-attractions">
+            <div
+              className="home-card-image"
+              style={{
+                backgroundImage:
+                  "url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600)",
+              }}
+            />
+            <div className="home-card-body">
+              <h3>Attractions</h3>
+              <p>
+                Explore popular sights, filter by interest, read reviews, save
+                favorites, and check locations on a map.
+              </p>
+              <button
+                type="button"
+                className="home-card-cta"
+                onClick={() =>
+                  user
+                    ? navigate("/attractions")
+                    : navigate("/register", { state: { from: "/attractions" } })
+                }
+              >
+                View attractions
               </button>
             </div>
           </div>

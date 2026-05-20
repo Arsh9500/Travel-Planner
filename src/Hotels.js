@@ -5,19 +5,33 @@ import { destinations } from "./data/destinations";
 import Logo from "./components/Logo";
 import { useAuth } from "./context/AuthContext";
 import { useItinerary } from "./context/ItineraryContext";
+import {
+  confirmCryptoPayment,
+  connectCryptoWallet,
+  estimateEthAmount,
+  getCryptoPaymentConfig,
+  isWalletAvailable,
+  sendCryptoPayment,
+} from "./services/cryptoPaymentService";
+import { processBookingPayment } from "./services/paymentService";
 import { saveUserHotelBooking } from "./utils/bookings";
+import {
+  isBookingEmailConfigured,
+  sendBookingConfirmationEmail,
+} from "./utils/email";
 import { loadUserWishlist, saveUserWishlist } from "./utils/wishlist";
 import "./Destinations.css";
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const GEOAPIFY_AUTOCOMPLETE_URL = "https://api.geoapify.com/v1/geocode/autocomplete";
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "AIzaSyDaTMu-tfWO3e51T5Yo_8jMScUrH5RkP8E";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const WIKIPEDIA_SUMMARY_BASE_URL = "https://en.wikipedia.org/api/rest_v1/page/summary";
 const FILTER_ALL_OPTION = "All";
 const DEFAULT_HOTEL_TYPES = ["Hotel", "Guest House", "Hostel", "Apartment", "Motel"];
 const DEFAULT_STAR_OPTIONS = ["Unrated", "3 Star", "4 Star", "5 Star"];
 const DEFAULT_AMENITIES = ["Wi-Fi", "Parking", "Pool", "Breakfast", "Accessible", "Air Conditioning", "General"];
-const PAYMENT_METHODS = ["Credit Card", "Debit Card", "Pay at Hotel"];
+const CRYPTO_PAYMENT_METHOD = "Blockchain/Crypto";
+const PAYMENT_METHODS = ["Credit Card", "Debit Card", "Pay at Hotel", CRYPTO_PAYMENT_METHOD];
 const BOOKING_CHATBOT_NOTICE_KEY = "hotel_booking_chatbot_notice";
 const COUNTRY_CITY_SEEDS = {
   australia: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast"],
@@ -107,10 +121,6 @@ function formatCurrency(amount) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(Number(amount) || 0);
-}
-
-function buildBookingReference() {
-  return `HB-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
 function normalizeCardNumber(value) {
@@ -283,8 +293,11 @@ function Hotels() {
   const [bookingErrors, setBookingErrors] = useState({});
   const [paymentErrors, setPaymentErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState("");
+  const [mailStatus, setMailStatus] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(null);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [walletInfo, setWalletInfo] = useState({ address: "", chainId: "" });
+  const [walletStatus, setWalletStatus] = useState("");
   const [hasAppliedAutoDestination, setHasAppliedAutoDestination] = useState(false);
 
   const routeDestination = (location.state?.destination || "").trim();
@@ -556,6 +569,13 @@ out center tags 24;
     return selectedStayNights * selectedNightlyRate + Math.max(0, guests - 1) * 25;
   }, [bookingForm.guests, selectedNightlyRate, selectedStayNights]);
 
+  const cryptoPaymentConfig = useMemo(() => getCryptoPaymentConfig(), []);
+
+  const estimatedCryptoAmount = useMemo(
+    () => estimateEthAmount(totalPrice),
+    [totalPrice]
+  );
+
   const receiptQrValue = useMemo(() => {
     if (!paymentSuccess) return "";
 
@@ -580,8 +600,10 @@ out center tags 24;
     setBookingErrors({});
     setPaymentErrors({});
     setPaymentStatus("");
+    setMailStatus("");
     setPaymentSuccess(null);
     setPaymentMethod(PAYMENT_METHODS[0]);
+    setWalletStatus("");
     setBookingForm({
       checkInDate: "",
       checkOutDate: "",
@@ -624,6 +646,17 @@ out center tags 24;
     setPaymentMethod(method);
     setPaymentErrors({});
     setPaymentStatus("");
+    setWalletStatus("");
+  };
+
+  const handleConnectWallet = async () => {
+    try {
+      const connectedWallet = await connectCryptoWallet();
+      setWalletInfo(connectedWallet);
+      setWalletStatus(`Wallet connected: ${connectedWallet.address.slice(0, 6)}...${connectedWallet.address.slice(-4)}`);
+    } catch (error) {
+      setWalletStatus(error?.message || "Could not connect wallet.");
+    }
   };
 
   const validateBookingForm = () => {
@@ -645,6 +678,21 @@ out center tags 24;
   };
 
   const validatePaymentForm = () => {
+    if (paymentMethod === CRYPTO_PAYMENT_METHOD) {
+      const nextErrors = {};
+      if (!isWalletAvailable()) {
+        nextErrors.crypto = "MetaMask is required for blockchain payments.";
+      }
+      if (!walletInfo.address) {
+        nextErrors.crypto = "Connect your crypto wallet before paying.";
+      }
+      if (!cryptoPaymentConfig.paymentAddress) {
+        nextErrors.crypto = "Crypto payment address is not configured.";
+      }
+      setPaymentErrors(nextErrors);
+      return Object.keys(nextErrors).length === 0;
+    }
+
     if (paymentMethod === "Pay at Hotel") {
       setPaymentErrors({});
       return true;
@@ -671,6 +719,11 @@ out center tags 24;
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
 
+    if (!user?.uid) {
+      setPaymentStatus("Please sign in before booking.");
+      return;
+    }
+
     const bookingOk = validateBookingForm();
     const paymentOk = validatePaymentForm();
     if (!bookingOk || !paymentOk) {
@@ -682,11 +735,57 @@ out center tags 24;
     setPaymentStatus("");
 
     try {
-      const bookingReference = buildBookingReference();
+      const bookingPayload = {
+        hotelName: selectedHotel.name,
+        destination: `${selectedHotel.city}, ${selectedHotel.country}`,
+        checkInDate: bookingForm.checkInDate,
+        checkOutDate: bookingForm.checkOutDate,
+        guests: Number(bookingForm.guests),
+      };
+      let paymentResult;
+
+      if (paymentMethod === CRYPTO_PAYMENT_METHOD) {
+        setPaymentStatus("Open MetaMask to approve the blockchain transaction.");
+        const cryptoTx = await sendCryptoPayment({
+          from: walletInfo.address,
+          amountUsd: totalPrice,
+        });
+        setPaymentStatus("Transaction submitted. Confirming payment on test network...");
+        paymentResult = await confirmCryptoPayment({
+          ...cryptoTx,
+          walletAddress: walletInfo.address,
+          amount: totalPrice,
+          currency: "USD",
+          booking: bookingPayload,
+        });
+      } else {
+        paymentResult = await processBookingPayment({
+          amount: totalPrice,
+          currency: "USD",
+          paymentMethod,
+          booking: bookingPayload,
+          paymentDetails:
+            paymentMethod === "Pay at Hotel"
+              ? {}
+              : {
+                  cardholderName: paymentForm.cardholderName.trim(),
+                  cardNumber: normalizeCardNumber(paymentForm.cardNumber),
+                  expiryDate: paymentForm.expiryDate,
+                  cvv: paymentForm.cvv,
+                },
+        });
+      }
+
       const bookingId = `${Date.now()}`;
       const nextPaymentSuccess = {
         bookingId,
-        bookingReference,
+        bookingReference: paymentResult.bookingReference,
+        paymentTransactionId: paymentResult.transactionId,
+        paymentGatewayMode: paymentResult.gatewayMode,
+        cryptoTxHash: paymentResult.txHash || "",
+        cryptoWalletAddress: paymentResult.walletAddress || "",
+        cryptoChainId: paymentResult.chainId || "",
+        cryptoAmount: paymentResult.cryptoAmount || "",
         userId: user.uid,
         hotelId: selectedHotel.id,
         hotelName: selectedHotel.name,
@@ -696,17 +795,14 @@ out center tags 24;
         guests: Number(bookingForm.guests),
         totalPrice,
         paymentMethod,
-        paymentStatus: "Paid",
-        bookingStatus: "Confirmed",
+        paymentStatus: paymentResult.paymentStatus,
+        bookingStatus: paymentResult.bookingStatus,
         createdAt: new Date().toISOString(),
         nightlyRate: selectedNightlyRate,
         nights: selectedStayNights,
         hotelImage: selectedHotel.image,
         hotelAddress: selectedHotel.address,
-        cardLast4:
-          paymentMethod === "Pay at Hotel"
-            ? ""
-            : normalizeCardNumber(paymentForm.cardNumber).slice(-4),
+        cardLast4: paymentResult.cardLast4 || "",
       };
 
       await saveUserHotelBooking(user.uid, nextPaymentSuccess);
@@ -730,9 +826,30 @@ out center tags 24;
       }
 
       setPaymentSuccess(nextPaymentSuccess);
-      setPaymentStatus("Payment successful. Your hotel booking is confirmed.");
-    } catch (_) {
-      setPaymentStatus("We could not save your booking right now. Please try again.");
+      setPaymentStatus(
+        paymentMethod === CRYPTO_PAYMENT_METHOD
+          ? "Blockchain payment confirmed on the test network. Your hotel booking is confirmed."
+          : paymentMethod === "Pay at Hotel"
+          ? "Booking confirmed. Payment will be collected at the hotel."
+          : "Payment successful. Your hotel booking is confirmed."
+      );
+
+      if (isBookingEmailConfigured() && user.email) {
+        try {
+          await sendBookingConfirmationEmail({
+            booking: nextPaymentSuccess,
+            email: user.email,
+            name: user.displayName || user.name,
+          });
+          setMailStatus(`Confirmation email sent to ${user.email}.`);
+        } catch (mailError) {
+          setMailStatus(mailError?.message || "Booking confirmed, but confirmation email could not be sent.");
+        }
+      } else {
+        setMailStatus("Booking confirmed. Configure EmailJS booking template to send confirmation email.");
+      }
+    } catch (error) {
+      setPaymentStatus(error?.message || "We could not save your booking right now. Please try again.");
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -991,14 +1108,53 @@ out center tags 24;
                   </div>
                 )}
 
+                {paymentMethod === CRYPTO_PAYMENT_METHOD && (
+                  <div className="hotel-payment-section crypto-payment-section">
+                    <h3>Crypto wallet</h3>
+                    <div className="crypto-wallet-panel">
+                      <div>
+                        <p>
+                          Pay approximately <strong>{estimatedCryptoAmount} ETH</strong> on the configured test network.
+                        </p>
+                        <p>
+                          Recipient: <strong>{cryptoPaymentConfig.paymentAddress || "Not configured"}</strong>
+                        </p>
+                        {cryptoPaymentConfig.requiredChainId && (
+                          <p>
+                            Required chain: <strong>{cryptoPaymentConfig.requiredChainId}</strong>
+                          </p>
+                        )}
+                      </div>
+                      <button type="button" className="hotel-payment-submit" onClick={handleConnectWallet}>
+                        {walletInfo.address ? "Reconnect Wallet" : "Connect MetaMask"}
+                      </button>
+                    </div>
+                    {walletInfo.address && (
+                      <p className="selected-payment-method">
+                        Connected wallet: <strong>{walletInfo.address.slice(0, 6)}...{walletInfo.address.slice(-4)}</strong>
+                      </p>
+                    )}
+                    {walletStatus && <p className="wallet-status">{walletStatus}</p>}
+                    {paymentErrors.crypto && <small className="crypto-payment-error">{paymentErrors.crypto}</small>}
+                  </div>
+                )}
+
                 {paymentStatus && (
                   <p className={paymentSuccess ? "hotel-payment-status is-success" : "hotel-payment-status is-error"}>
                     {paymentStatus}
                   </p>
                 )}
 
+                {mailStatus && <p className="hotel-payment-status is-success">{mailStatus}</p>}
+
                 <button type="submit" className="hotel-payment-submit" disabled={isSubmittingPayment}>
-                  {isSubmittingPayment ? "Processing..." : paymentMethod === "Pay at Hotel" ? "Confirm Booking" : "Pay Now"}
+                  {isSubmittingPayment
+                    ? "Processing..."
+                    : paymentMethod === CRYPTO_PAYMENT_METHOD
+                    ? "Pay With Wallet"
+                    : paymentMethod === "Pay at Hotel"
+                    ? "Confirm Booking"
+                    : "Pay Now"}
                 </button>
               </form>
 
@@ -1013,6 +1169,9 @@ out center tags 24;
                     <li><span>Nights</span><strong>{selectedStayNights || "-"}</strong></li>
                     <li><span>Guests</span><strong>{bookingForm.guests || "1"}</strong></li>
                     <li><span>Payment method</span><strong>{paymentMethod}</strong></li>
+                    {paymentMethod === CRYPTO_PAYMENT_METHOD && (
+                      <li><span>Estimated crypto</span><strong>{estimatedCryptoAmount} ETH</strong></li>
+                    )}
                     <li><span>Total price</span><strong>{formatCurrency(totalPrice)}</strong></li>
                   </ul>
                 </div>
@@ -1025,7 +1184,11 @@ out center tags 24;
           <section className="hotel-receipt-panel">
             <div className="hotel-receipt-copy">
               <p className="hotel-booking-eyebrow">Receipt</p>
-              <h2>Payment successful. Your hotel booking is confirmed.</h2>
+              <h2>
+                {paymentSuccess.paymentStatus === "Pending"
+                  ? "Your hotel booking is confirmed."
+                  : "Payment successful. Your hotel booking is confirmed."}
+              </h2>
               <p>Your receipt and QR code are ready below.</p>
               <div className="hotel-receipt-details">
                 <p><strong>Booking ID:</strong> {paymentSuccess.bookingId}</p>
@@ -1039,6 +1202,8 @@ out center tags 24;
                 <p><strong>Payment method:</strong> {paymentSuccess.paymentMethod}</p>
                 <p><strong>Payment status:</strong> {paymentSuccess.paymentStatus}</p>
                 <p><strong>Booking status:</strong> {paymentSuccess.bookingStatus}</p>
+                {paymentSuccess.cryptoTxHash && <p><strong>Crypto transaction:</strong> {paymentSuccess.cryptoTxHash}</p>}
+                {paymentSuccess.cryptoWalletAddress && <p><strong>Wallet:</strong> {paymentSuccess.cryptoWalletAddress}</p>}
               </div>
             </div>
             <div className="hotel-qr-card">

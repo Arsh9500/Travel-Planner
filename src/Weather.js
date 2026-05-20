@@ -8,8 +8,6 @@ import "./Weather.css";
 // Replace with your own free API key from https://openweathermap.org (or another provider)
 const API_BASE = "https://api.openweathermap.org/data/2.5/weather";
 const FORECAST_API_BASE = "https://api.openweathermap.org/data/2.5/forecast";
-// Convenience fallback for quick testing.
-const DEFAULT_API_KEY = "b0de676fca853faaf818b515e2940193"; // demo only
 
 function getWeatherRecommendation(result) {
   const weatherMain = (result?.weather?.[0]?.main || "").toLowerCase();
@@ -263,13 +261,9 @@ function Weather() {
     setPlacesError("");
     setPlacesNotice("");
 
-    let apiKey = process.env.REACT_APP_WEATHER_API_KEY;
+    const apiKey = process.env.REACT_APP_WEATHER_API_KEY;
     if (!apiKey) {
-      apiKey = DEFAULT_API_KEY;
-      console.warn("REACT_APP_WEATHER_API_KEY not set; falling back to default");
-    }
-    if (!apiKey) {
-      setError("API key is missing. Please create a .env file with REACT_APP_WEATHER_API_KEY set or hard-code one.");
+      setError("API key is missing. Please set REACT_APP_WEATHER_API_KEY in .env.");
       return;
     }
 
