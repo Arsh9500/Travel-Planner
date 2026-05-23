@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Logo from "./components/Logo";
-import { isEmailServiceConfigured, sendContactEmail } from "./utils/email";
+import { CONTACT_RECIPIENT, isEmailServiceConfigured, sendContactEmail } from "./utils/email";
 import "./About.css";
 
 const founders = [
@@ -36,12 +36,14 @@ function About() {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", message: "" });
   const [contactStatus, setContactStatus] = useState("");
   const [contactError, setContactError] = useState("");
+  const [fallbackMailLink, setFallbackMailLink] = useState("");
   const [sending, setSending] = useState(false);
 
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     setContactStatus("");
     setContactError("");
+    setFallbackMailLink("");
 
     const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
@@ -59,7 +61,12 @@ function About() {
     }
 
     if (!isEmailServiceConfigured()) {
-      setContactError("Email delivery is currently unavailable. Please contact us using the email address shown on this page.");
+      const subject = encodeURIComponent(`Trip Planner contact from ${firstName} ${lastName}`.trim());
+      const body = encodeURIComponent(
+        `Name: ${firstName} ${lastName}\nEmail: ${recipientEmail}\n\n${message}`
+      );
+      setContactError("Direct sending is not configured yet. You can open this message in your email app instead.");
+      setFallbackMailLink(`mailto:${CONTACT_RECIPIENT}?subject=${subject}&body=${body}`);
       return;
     }
 
@@ -163,6 +170,11 @@ function About() {
               <form onSubmit={handleContactSubmit}>
                 {contactError && <p className="contact-form-error">{contactError}</p>}
                 {contactStatus && <p className="contact-form-success">{contactStatus}</p>}
+                {fallbackMailLink && (
+                  <a className="contact-mail-fallback" href={fallbackMailLink}>
+                    Open email app
+                  </a>
+                )}
                 <div className="form-row">
                   <input
                     type="text"

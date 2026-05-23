@@ -4,10 +4,5 @@ Press CTRL+C to quit
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 795-535-869
-127.0.0.1 - - [13/May/2026 23:04:04] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:04:59] "OPTIONS /recommend-hotels HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:04:59] "OPTIONS /recommend-attractions HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:05:03] "POST /recommend-hotels HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:05:09] "OPTIONS /recommend-attractions HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:05:11] "POST /recommend-attractions HTTP/1.1" 200 -
-127.0.0.1 - - [13/May/2026 23:05:18] "POST /recommend-attractions HTTP/1.1" 200 -
+127.0.0.1 - - [20/May/2026 16:48:20] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [20/May/2026 16:48:37] "POST /payments/crypto/confirm HTTP/1.1" 200 -

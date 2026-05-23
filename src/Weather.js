@@ -328,7 +328,6 @@ function Weather() {
     if (!result) return;
 
     const city = result.name || location;
-    const weatherDesc = result.weather?.[0]?.description || "weather";
     const temp = Math.round(result.main?.temp || 0);
 
     setPlacesLoading(true);
