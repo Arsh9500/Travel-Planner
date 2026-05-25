@@ -3,6 +3,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 14% 10%, rgba(0, 178, 166, 0.1), transparent 28%),
     linear-gradient(180deg, #fbfdff 0%, #f0f6fb 100%);
@@ -170,14 +171,15 @@
   max-width: 1000px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1fr);
   gap: 48px;
   align-items: start;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 860px) {
   .get-in-touch-inner {
     grid-template-columns: 1fr;
+    gap: 28px;
   }
 }
 
@@ -199,7 +201,15 @@
 }
 
 .contact-icon {
-  font-size: 1.25rem;
+  width: 70px;
+  flex: 0 0 70px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
   flex-shrink: 0;
 }
 
@@ -229,11 +239,10 @@
   background: rgba(255, 255, 255, 0.92);
   color: #1a1a2e;
   padding: 28px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow: 0 28px 62px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(12px);
-  transform: rotateY(-2deg) translateZ(0);
 }
 
 .get-in-touch-form-card h3 {
@@ -273,14 +282,38 @@
 .contact-form-success {
   font-size: 0.9rem;
   margin: 0 0 12px;
+  line-height: 1.45;
 }
 
 .contact-form-error {
   color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
 }
 
 .contact-form-success {
   color: #047857;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.contact-mail-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  margin: 0 0 14px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.22);
 }
 
 .send-message-btn {
@@ -338,6 +371,25 @@
 
 .footer-brand {
   max-width: 320px;
+}
+
+@media (max-width: 560px) {
+  .about-get-in-touch {
+    padding: 36px 16px;
+  }
+
+  .get-in-touch-form-card {
+    padding: 20px;
+  }
+
+  .get-in-touch-form-card .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .contact-detail {
+    align-items: flex-start;
+  }
 }
 
 .footer-logo {

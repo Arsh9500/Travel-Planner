@@ -11,7 +11,7 @@ Simple Flask backend with:
 ```bash
 cd backend
 pip install -r requirements.txt
-python app.py
+python run_server.py
 ```
 
 The API runs at `http://127.0.0.1:5000`.
@@ -24,6 +24,8 @@ Set these on the backend so secrets stay out of the frontend:
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.0-flash
 GOOGLE_PLACES_API_KEY=your_google_places_key
+OLLAMA_API_URL=http://localhost:11434/api/generate
+OLLAMA_MODEL=gemma3:1b
 ```
 
 ## Endpoints
@@ -146,3 +148,9 @@ Direct Gemini route for travel-assistant style replies.
 ### `POST /chat/places`
 
 Direct Google Places route for live place lookup.
+
+### `POST /recommend-attractions`
+
+Ollama-powered attraction and live-event-style ideas for itinerary planning. When
+`GOOGLE_PLACES_API_KEY` is configured, the backend first gathers current Google
+Places matches and passes that context to Ollama.

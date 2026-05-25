@@ -437,13 +437,35 @@ def recommend_attractions():
         for value in preferences.values()
         if value is not None and str(value).strip()
     )
+    live_places = []
+    live_context = ""
+
+    try:
+        places_result = search_places(
+            f"live events attractions things to do in {destination}",
+            "places",
+            context={"selectedDestination": destination},
+        )
+        live_places = places_result.get("places", [])[:5]
+        if live_places:
+            live_context = "; ".join(
+                f"{place.get('name')} ({place.get('address', 'address unavailable')})"
+                for place in live_places
+                if place.get("name")
+            )
+    except Exception:
+        # Ollama can still provide recommendations when Google Places is not configured or reachable.
+        live_places = []
 
     prompt = (
-        "Recommend 5 tourist attractions for a travel itinerary. "
-        "Use the destination and preferences to personalize the list. "
+        "Recommend 5 attractions or live-event-style things to do for a travel itinerary. "
+        "Use the destination, trip preferences, and any Google Places context to personalize the list. "
+        "If Google context is provided, prefer those live map/search results. "
         "Return only valid JSON as an array of objects with name and reason fields. "
         f"Destination: {destination}. "
-        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}."
+        f"Travel date context: {time.strftime('%Y-%m-%d')}. "
+        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}. "
+        f"Google Places context: {live_context or 'not available'}."
     )
 
     try:
@@ -455,7 +477,7 @@ def recommend_attractions():
         ollama_resp.raise_for_status()
         raw_response = ollama_resp.json().get("response", "")
         attractions = parse_attraction_response(raw_response)
-        return jsonify({"attractions": attractions, "raw": raw_response})
+        return jsonify({"attractions": attractions, "livePlaces": live_places, "raw": raw_response})
     except http_req.exceptions.ConnectionError:
         return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
     except http_req.exceptions.ReadTimeout:
@@ -635,8 +657,51 @@ def weather_ai_suggestions():
         return jsonify({"error": "city, weather, and temp are required"}), 400
 
     prompt = (
-        f"Suggest 4 simple things to do in {city} when the weather is {weather} "
-        f"and temperature is {temp}\u00b0C."
+        f"Provide four professional and concise activity recommendations for a visitor in {city} "
+        f"given the current weather of {weather} and a temperature of {temp}\u00b0C. "
+        "Use complete sentences, keep the tone polished, and format each recommendation as a separate line."
+    )
+
+    try:
+        ollama_resp = http_req.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "gemma3:1b", "prompt": prompt, "stream": False},
+            timeout=60,
+        )
+        ollama_resp.raise_for_status()
+        suggestions = ollama_resp.json().get("response", "")
+        return jsonify({"suggestions": suggestions})
+    except http_req.exceptions.ConnectionError:
+        return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.post("/transport-ai")
+def transport_ai_suggestions():
+    payload = request.get_json(silent=True) or {}
+    origin = (payload.get("origin") or "").strip()
+    destination = (payload.get("destination") or "").strip()
+    travel_date = (payload.get("date") or "").strip()
+    preference = (payload.get("preference") or "balanced").strip()
+    budget = (payload.get("budget") or "").strip()
+
+    if not origin or not destination:
+        return jsonify({"error": "origin and destination are required"}), 400
+
+    prompt = (
+        "You are a smart transport assistant for a travel planning website. "
+        f"The user needs directions from {origin} to {destination}. "
+        f"Travel date: {travel_date or 'not specified'}. "
+        f"Preferred route type: {preference}. "
+        f"Budget guidance: {budget or 'moderate'}. "
+        "Provide a transport recommendation that includes:\n"
+        "- best route options (public transit, rideshare, taxi, shuttle, or train)\n"
+        "- estimated travel time for each option\n"
+        "- cost estimate for each option\n"
+        "- personalized advice for the chosen preference\n"
+        "- a short smart tip for the traveler\n"
+        "Answer in plain text suitable for display in a transport assistant page."
     )
 
     try:

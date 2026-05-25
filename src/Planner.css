@@ -196,3 +196,25 @@
   margin: 0;
   color: #334155;
 }
+
+.planner-live-places {
+  margin-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.planner-live-places h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.planner-live-places a {
+  display: inline-flex;
+  margin: 0 8px 8px 0;
+  border-radius: 8px;
+  background: #e0f2fe;
+  color: #075985;
+  padding: 8px 10px;
+  text-decoration: none;
+  font-weight: 700;
+}

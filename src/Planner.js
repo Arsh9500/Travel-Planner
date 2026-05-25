@@ -12,6 +12,13 @@ function normalizeDestinationQuery(rawDestination) {
   return rawDestination.split(",")[0].trim();
 }
 
+function getFriendlyFetchError(error) {
+  if (error?.message === "Failed to fetch") {
+    return "Backend is not reachable. Start the Flask API on http://127.0.0.1:5000 and make sure Ollama is running.";
+  }
+  return error?.message || "Unable to load attraction recommendations.";
+}
+
 function Planner() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -35,6 +42,7 @@ function Planner() {
   const [hotelRecommendations, setHotelRecommendations] = useState([]);
   const [hotelRecommendationsLoading, setHotelRecommendationsLoading] = useState(false);
   const [attractionRecommendations, setAttractionRecommendations] = useState([]);
+  const [liveAttractionPlaces, setLiveAttractionPlaces] = useState([]);
   const [attractionRecommendationsLoading, setAttractionRecommendationsLoading] = useState(false);
   const [attractionRecommendationsError, setAttractionRecommendationsError] = useState("");
   const [showAttractionPopup, setShowAttractionPopup] = useState(false);
@@ -204,6 +212,7 @@ function Planner() {
     const destinationQuery = normalizeDestinationQuery(itineraryDestination);
     if (!destinationQuery) {
       setAttractionRecommendations([]);
+      setLiveAttractionPlaces([]);
       setAttractionRecommendationsError("");
       setAttractionRecommendationsLoading(false);
       setShowAttractionPopup(false);
@@ -245,24 +254,28 @@ function Planner() {
 
         if (response.ok) {
           const attractions = data.attractions || [];
+          const livePlaces = data.livePlaces || [];
           setAttractionRecommendations(attractions);
-          if (attractions.length > 0 && dismissedAttractionDestinationRef.current !== destinationQuery) {
+          setLiveAttractionPlaces(livePlaces);
+          if (
+            (attractions.length > 0 || livePlaces.length > 0) &&
+            dismissedAttractionDestinationRef.current !== destinationQuery
+          ) {
             setShowAttractionPopup(true);
           }
         } else {
           setAttractionRecommendations([]);
+          setLiveAttractionPlaces([]);
           setAttractionRecommendationsError(data.error || "Unable to load attraction recommendations.");
-          if (dismissedAttractionDestinationRef.current !== destinationQuery) {
-            setShowAttractionPopup(true);
-          }
+          setShowAttractionPopup(false);
         }
       } catch (error) {
         if (!cancelled) {
           setAttractionRecommendations([]);
-          setAttractionRecommendationsError(error.message || "Unable to load attraction recommendations.");
-          if (dismissedAttractionDestinationRef.current !== destinationQuery) {
-            setShowAttractionPopup(true);
-          }
+          setLiveAttractionPlaces([]);
+          setAttractionRecommendationsError(getFriendlyFetchError(error));
+          setShowAttractionPopup(false);
+          console.warn("Attraction recommendations unavailable:", error);
         }
       } finally {
         if (!cancelled) setAttractionRecommendationsLoading(false);
@@ -371,14 +384,14 @@ function Planner() {
         <div className="planner-popup-backdrop" role="presentation">
           <section className="planner-attraction-popup" role="dialog" aria-modal="true">
             <div className="planner-popup-header">
-              <h2>Recommended Attractions in {normalizeDestinationQuery(itineraryDestination)}</h2>
+              <h2>Live Event and Attraction Ideas in {normalizeDestinationQuery(itineraryDestination)}</h2>
               <button type="button" onClick={closeAttractionPopup} aria-label="Close attraction recommendations">
                 x
               </button>
             </div>
 
             {attractionRecommendationsLoading && (
-              <p className="planner-empty">Finding attractions with Ollama...</p>
+              <p className="planner-empty">Finding live map context and asking Ollama...</p>
             )}
 
             {!attractionRecommendationsLoading && attractionRecommendationsError && (
@@ -394,6 +407,22 @@ function Planner() {
                   </article>
                 ))}
               </div>
+            )}
+
+            {!attractionRecommendationsLoading && liveAttractionPlaces.length > 0 && (
+              <section className="planner-live-places" aria-label="Google Maps live places">
+                <h3>Google Maps matches</h3>
+                {liveAttractionPlaces.map((place) => (
+                  <a
+                    key={place.placeId || `${place.name}-${place.address}`}
+                    href={place.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {place.name}
+                  </a>
+                ))}
+              </section>
             )}
           </section>
         </div>
@@ -499,6 +528,10 @@ function Planner() {
         <section className="planner-notifications-card">
           <h2>Smart Recommendations for {itineraryDestination}</h2>
           <p className="planner-empty">Book Hotel: ready to find stays that match this itinerary destination.</p>
+
+          {attractionRecommendationsError && (
+            <p className="planner-empty">{attractionRecommendationsError}</p>
+          )}
 
           {hotelRecommendationsLoading && <p className="planner-empty">Loading hotel recommendations...</p>}
 

@@ -230,34 +230,6 @@ function Home() {
               </button>
             </div>
           </div>
-
-          <div className="home-card home-card-attractions">
-            <div
-              className="home-card-image"
-              style={{
-                backgroundImage:
-                  "url(https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600)",
-              }}
-            />
-            <div className="home-card-body">
-              <h3>Attractions</h3>
-              <p>
-                Explore popular sights, filter by interest, read reviews, save
-                favorites, and check locations on a map.
-              </p>
-              <button
-                type="button"
-                className="home-card-cta"
-                onClick={() =>
-                  user
-                    ? navigate("/attractions")
-                    : navigate("/register", { state: { from: "/attractions" } })
-                }
-              >
-                View attractions
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 

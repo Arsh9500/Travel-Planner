@@ -15,6 +15,7 @@ import Budget from "./Budget";
 import Profile from "./Profile";
 import Weather from "./Weather";
 import Dashboard from "./Dashboard";
+import Transport from "./Transport";
 import Admin from "./Admin";
 
 // Guard: redirect to register if not logged in (keeps "from" path for after login)
@@ -57,6 +58,7 @@ function App() {
             <Route path="/planner" element={<ProtectedRoute><Planner /></ProtectedRoute>} />
             <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
             <Route path="/weather" element={<ProtectedRoute><Weather /></ProtectedRoute>} />
+            <Route path="/transport" element={<ProtectedRoute><Transport /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />

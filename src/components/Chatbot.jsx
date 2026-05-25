@@ -529,7 +529,7 @@ function Chatbot({ user }) {
         onClick={() => setChatOpen((prev) => !prev)}
       >
         <span className="chatbot-toggle-icon" aria-hidden="true">
-          {chatOpen ? "x" : "💬"}
+          {chatOpen ? "x" : "AI"}
         </span>
         <span>{chatOpen ? "Close Chat" : "Chat"}</span>
         {!chatOpen && chatBadgeCount > 0 && (
@@ -540,8 +540,11 @@ function Chatbot({ user }) {
       {chatOpen && (
         <div className="chatbot-panel">
           <div className="chatbot-header">
-            <span className="chatbot-header-avatar" aria-hidden="true">🤖</span>
-            <span>Travel Chatbot</span>
+            <span className="chatbot-header-avatar" aria-hidden="true">AI</span>
+            <div>
+              <span>Travel Chatbot</span>
+              <small>Hotels, places, budgets, and trips</small>
+            </div>
           </div>
 
           <div className="chatbot-suggestions">
@@ -560,7 +563,7 @@ function Chatbot({ user }) {
           <div className="chatbot-messages">
             {chatMessages.length === 0 && (
               <div className="chatbot-empty">
-                <span className="chatbot-empty-icon" aria-hidden="true">✈️</span>
+                <span className="chatbot-empty-icon" aria-hidden="true">AI</span>
                 Ask about hotels, attractions, destinations, budgets, or nearby places.
               </div>
             )}
@@ -569,7 +572,7 @@ function Chatbot({ user }) {
               <div key={message.id} className="chatbot-message-wrap">
                 <div className={`chatbot-message ${message.role === "user" ? "chat-user" : "chat-bot"}`}>
                   {message.role === "bot" && (
-                    <span className="chatbot-message-icon" aria-hidden="true">🤖</span>
+                    <span className="chatbot-message-icon" aria-hidden="true">AI</span>
                   )}
                   {message.text}
                 </div>
@@ -594,7 +597,7 @@ function Chatbot({ user }) {
                           <p>
                             {place.rating ? `Rating: ${place.rating}` : "Rating unavailable"}
                             {place.coordinates?.lat && place.coordinates?.lng
-                              ? ` · ${place.coordinates.lat}, ${place.coordinates.lng}`
+                              ? ` - ${place.coordinates.lat}, ${place.coordinates.lng}`
                               : ""}
                           </p>
                           <div className="chatbot-place-actions">
