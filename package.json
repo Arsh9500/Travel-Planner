@@ -18,6 +18,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "backend": "cd backend && .\\.venv312\\Scripts\\python.exe run_server.py",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

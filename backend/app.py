@@ -437,13 +437,35 @@ def recommend_attractions():
         for value in preferences.values()
         if value is not None and str(value).strip()
     )
+    live_places = []
+    live_context = ""
+
+    try:
+        places_result = search_places(
+            f"live events attractions things to do in {destination}",
+            "places",
+            context={"selectedDestination": destination},
+        )
+        live_places = places_result.get("places", [])[:5]
+        if live_places:
+            live_context = "; ".join(
+                f"{place.get('name')} ({place.get('address', 'address unavailable')})"
+                for place in live_places
+                if place.get("name")
+            )
+    except Exception:
+        # Ollama can still provide recommendations when Google Places is not configured or reachable.
+        live_places = []
 
     prompt = (
-        "Recommend 5 tourist attractions for a travel itinerary. "
-        "Use the destination and preferences to personalize the list. "
+        "Recommend 5 attractions or live-event-style things to do for a travel itinerary. "
+        "Use the destination, trip preferences, and any Google Places context to personalize the list. "
+        "If Google context is provided, prefer those live map/search results. "
         "Return only valid JSON as an array of objects with name and reason fields. "
         f"Destination: {destination}. "
-        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}."
+        f"Travel date context: {time.strftime('%Y-%m-%d')}. "
+        f"Preferences: {preference_text or 'general sightseeing and memorable local experiences'}. "
+        f"Google Places context: {live_context or 'not available'}."
     )
 
     try:
@@ -455,7 +477,7 @@ def recommend_attractions():
         ollama_resp.raise_for_status()
         raw_response = ollama_resp.json().get("response", "")
         attractions = parse_attraction_response(raw_response)
-        return jsonify({"attractions": attractions, "raw": raw_response})
+        return jsonify({"attractions": attractions, "livePlaces": live_places, "raw": raw_response})
     except http_req.exceptions.ConnectionError:
         return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
     except http_req.exceptions.ReadTimeout:

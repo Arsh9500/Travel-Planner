@@ -272,6 +272,100 @@
   font-weight: 700;
 }
 
+.attraction-search-status {
+  margin-bottom: 18px;
+}
+
+.attraction-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.attraction-search-popup {
+  width: min(590px, 100%);
+  max-height: min(720px, 88vh);
+  overflow: auto;
+  border: 1px solid rgba(33, 62, 118, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  padding: 18px;
+}
+
+.attraction-popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.attraction-popup-header h2 {
+  margin: 0;
+  color: #0c1635;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.attraction-popup-header button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #0c1635;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.attraction-popup-list {
+  display: grid;
+  gap: 10px;
+}
+
+.attraction-popup-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.attraction-popup-item h3,
+.attraction-popup-maps h3 {
+  margin: 0 0 7px;
+  color: #0c1635;
+  font-size: 1rem;
+}
+
+.attraction-popup-item p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.attraction-popup-maps {
+  margin-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.attraction-popup-maps a {
+  display: inline-flex;
+  margin: 0 8px 8px 0;
+  border-radius: 8px;
+  background: #e0f2fe;
+  color: #075985;
+  padding: 8px 10px;
+  text-decoration: none;
+  font-weight: 800;
+}
+
 .attraction-detail {
   position: sticky;
   top: 18px;
@@ -365,6 +459,27 @@
   border: 0;
   border-radius: 8px;
   background: #dce8f5;
+}
+
+.map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.map-actions a,
+.map-actions button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 13px;
+  background: linear-gradient(120deg, #1b67ff, #00b2a6);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .saved-attractions {
