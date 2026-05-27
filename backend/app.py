@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+import os
+import json
 import requests as http_req
 from pathlib import Path
 import pandas as pd
@@ -455,6 +457,246 @@ def transport_ai_suggestions():
         return jsonify({"suggestions": suggestions})
     except http_req.exceptions.ConnectionError:
         return jsonify({"error": "Ollama is not running. Start it with: ollama serve"}), 503
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+def format_duration(minutes: int) -> str:
+    hours = minutes // 60
+    mins = minutes % 60
+    return f"{hours}h {mins}m" if hours else f"{mins}m"
+
+
+def calculate_arrival_time(departure_time: str, duration_minutes: int) -> str:
+    """Calculate arrival time by adding duration to departure time."""
+    try:
+        if departure_time == "Anytime":
+            return "Flexible"
+        hours, mins = map(int, departure_time.split(':'))
+        total_minutes = hours * 60 + mins + duration_minutes
+        arrival_hours = (total_minutes // 60) % 24
+        arrival_mins = total_minutes % 60
+        return f"{arrival_hours:02d}:{arrival_mins:02d}"
+    except:
+        return "N/A"
+
+
+def create_booking_url(origin, destination, transport_type, provider, departure_date):
+    """Generate booking URLs to popular travel booking websites (global coverage)"""
+    if transport_type == "flight":
+        # Google Flights - works globally for flight searches
+        return f"https://www.google.com/flights?fPrt1={origin}&fPrt2={destination}&dDate1={departure_date}&travel_type=r"
+    elif transport_type == "train":
+        # Skyscanner for trains - global coverage with train schedules
+        return f"https://www.skyscanner.com/transport/trains/{origin.lower()}/{destination.lower()}/{departure_date}/"
+    elif transport_type == "bus":
+        # Busbud - operates in 100+ countries globally for bus bookings
+        return f"https://www.busbud.com/en/search?fn={origin}&tn={destination}&outDate={departure_date}"
+    else:
+        # Kayak car rentals - global coverage for car rental searches
+        return f"https://www.kayak.com/cars.html?startDate={departure_date}&endLocation={destination}&startLocation={origin}"
+
+
+def generate_booking_options(origin, destination, departure_date, return_date, transport_type, travelers, cabin):
+    """Generate realistic booking options using AI for accurate travel times and prices."""
+    api_key = os.getenv("GROQ_API_KEY")
+    
+    # Fallback to hardcoded options if API is not available
+    if not api_key:
+        return generate_booking_options_fallback(origin, destination, departure_date, return_date, transport_type, travelers, cabin)
+    
+    try:
+        prompt = f"""Generate realistic transport booking options for:
+- Origin: {origin}
+- Destination: {destination}
+- Date: {departure_date}
+- Transport Type: {transport_type}
+- Travelers: {travelers}
+
+Return a JSON array with exactly 2-3 booking options. Each option must have:
+- provider: (company name)
+- departureTime: (HH:MM format, realistic for the route)
+- arrivalTime: (HH:MM format, must be after departure + realistic travel time)
+- price: ($X format)
+- duration: (Xh Ym format, realistic for {transport_type} between these cities)
+
+For {transport_type}, typical durations are:
+- Flight: 1-4 hours + 1-2 hours layover time
+- Train: 2-8 hours depending on distance
+- Bus: 3-12 hours depending on distance
+- Car rental: 2-10 hours depending on distance
+
+Return ONLY valid JSON array, no markdown or explanation."""
+
+        endpoint = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a travel booking assistant. Generate realistic transport booking options with accurate times and prices. Return only valid JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            "temperature": 0.8,
+            "max_tokens": 1000,
+        }
+        
+        response = http_req.post(
+            endpoint,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        body = response.json()
+        
+        choices = body.get("choices") or []
+        if not choices:
+            return generate_booking_options_fallback(origin, destination, departure_date, return_date, transport_type, travelers, cabin)
+        
+        text = (choices[0].get("message") or {}).get("content", "").strip()
+        
+        # Extract JSON from response
+        json_match = text
+        if "```" in text:
+            json_match = text.split("```")[1].replace("json", "").strip()
+        
+        try:
+            options_data = json.loads(json_match)
+            if isinstance(options_data, list):
+                formatted_options = []
+                for opt in options_data:
+                    formatted_options.append({
+                        "provider": opt.get("provider", "Transport Co"),
+                        "mode": transport_type.capitalize(),
+                        "route": f"{origin} → {destination}",
+                        "departureTime": opt.get("departureTime", "N/A"),
+                        "arrivalTime": opt.get("arrivalTime", "N/A"),
+                        "duration": opt.get("duration", "N/A"),
+                        "price": opt.get("price", "$0"),
+                        "cabin": cabin.capitalize(),
+                        "travelers": travelers,
+                        "bookingUrl": create_booking_url(origin, destination, transport_type, opt.get("provider", ""), departure_date),
+                    })
+                return formatted_options
+        except:
+            pass
+    except:
+        pass
+    
+    # Fallback to default options
+    return generate_booking_options_fallback(origin, destination, departure_date, return_date, transport_type, travelers, cabin)
+
+
+def generate_booking_options_fallback(origin, destination, departure_date, return_date, transport_type, travelers, cabin):
+    options = []
+    if transport_type == "flight":
+        providers = ["AeroJet", "SkyConnect", "BlueWing"]
+        base_price = 120
+        for idx, provider in enumerate(providers, start=1):
+            depart = f"{8 + idx}:15"
+            duration = 95 + idx * 15
+            options.append({
+                "provider": provider,
+                "mode": "Flight",
+                "route": f"{origin} → {destination}",
+                "departureTime": depart,
+                "arrivalTime": calculate_arrival_time(depart, duration),
+                "duration": format_duration(duration),
+                "price": f"${base_price + idx * 40}",
+                "cabin": cabin.capitalize(),
+                "travelers": travelers,
+                "bookingUrl": create_booking_url(origin, destination, transport_type, provider, departure_date),
+            })
+    elif transport_type == "train":
+        providers = ["National Rail", "ExpressLine"]
+        base_price = 35
+        for idx, provider in enumerate(providers, start=1):
+            depart = f"{7 + idx}:00"
+            duration = 180 + idx * 20
+            options.append({
+                "provider": provider,
+                "mode": "Train",
+                "route": f"{origin} → {destination}",
+                "departureTime": depart,
+                "arrivalTime": calculate_arrival_time(depart, duration),
+                "duration": format_duration(duration),
+                "price": f"${base_price + idx * 15}",
+                "cabin": "Standard",
+                "travelers": travelers,
+                "bookingUrl": create_booking_url(origin, destination, transport_type, provider, departure_date),
+            })
+    elif transport_type == "bus":
+        providers = ["CityBus", "Comfort Coach"]
+        base_price = 18
+        for idx, provider in enumerate(providers, start=1):
+            depart = f"{6 + idx * 2}:30"
+            duration = 240 + idx * 30
+            options.append({
+                "provider": provider,
+                "mode": "Bus",
+                "route": f"{origin} → {destination}",
+                "departureTime": depart,
+                "arrivalTime": calculate_arrival_time(depart, duration),
+                "duration": format_duration(duration),
+                "price": f"${base_price + idx * 8}",
+                "cabin": "Standard",
+                "travelers": travelers,
+                "bookingUrl": create_booking_url(origin, destination, transport_type, provider, departure_date),
+            })
+    else:
+        providers = ["RideNow", "CityShare"]
+        base_price = 40
+        for idx, provider in enumerate(providers, start=1):
+            depart = "Anytime"
+            duration = 55 + idx * 10
+            options.append({
+                "provider": provider,
+                "mode": "Rideshare",
+                "route": f"{origin} → {destination}",
+                "departureTime": depart,
+                "arrivalTime": "Flexible",
+                "duration": format_duration(duration),
+                "price": f"${base_price + idx * 20}",
+                "cabin": cabin.capitalize(),
+                "travelers": travelers,
+                "bookingUrl": create_booking_url(origin, destination, transport_type, provider, departure_date),
+            })
+    return options
+
+
+@app.post("/transport-booking")
+def transport_booking_options():
+    payload = request.get_json(silent=True) or {}
+    origin = (payload.get("origin") or "").strip()
+    destination = (payload.get("destination") or "").strip()
+    departure_date = (payload.get("departureDate") or "").strip()
+    return_date = (payload.get("returnDate") or "").strip()
+    transport_type = (payload.get("transportType") or "flight").strip().lower()
+    travelers = int(payload.get("travelers") or 1)
+    cabin = (payload.get("cabin") or "economy").strip()
+
+    if not origin or not destination or not departure_date:
+        return jsonify({"error": "origin, destination, and departureDate are required"}), 400
+
+    try:
+        options = generate_booking_options(
+            origin,
+            destination,
+            departure_date,
+            return_date,
+            transport_type,
+            travelers,
+            cabin,
+        )
+        return jsonify({"options": options})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 

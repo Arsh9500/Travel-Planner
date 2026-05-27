@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getTransportAiSuggestions } from "./services/transportAiService";
+import { getTransportAiSuggestions, getTransportBookingOptions } from "./services/transportAiService";
 import "./Transport.css";
 
 const travelPreferences = [
@@ -15,12 +15,17 @@ function Transport() {
   const [destination, setDestination] = useState("");
   const [travelDate, setTravelDate] = useState("");
   const [preference, setPreference] = useState("balanced");
-  const [budget, setBudget] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [bookingType, setBookingType] = useState("flight");
+  const [travelers, setTravelers] = useState(1);
+  const [bookingResults, setBookingResults] = useState([]);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState("");
 
-  const canSubmit = origin.trim() && destination.trim();
+  const canSubmit = origin.trim() && destination.trim() && travelDate;
+  const canBook = origin.trim() && destination.trim() && travelDate;
   const headerText = useMemo(
     () => `Smart transport assistant for ${origin || "origin"} to ${destination || "destination"}`,
     [origin, destination]
@@ -51,12 +56,39 @@ function Transport() {
     setLoading(true);
 
     try {
-      const data = await getTransportAiSuggestions({ origin, destination, date: travelDate, preference, budget });
+      const data = await getTransportAiSuggestions({ origin, destination, date: travelDate, preference });
       setResult(data.suggestions || "No transport recommendations were returned.");
     } catch (err) {
       setError(err.message || "Unable to fetch transport suggestions.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBookingSubmit = async (event) => {
+    event.preventDefault();
+    if (!canBook) {
+      setBookingError("Please enter origin, destination, and departure date.");
+      return;
+    }
+
+    setBookingError("");
+    setBookingResults([]);
+    setBookingLoading(true);
+
+    try {
+      const data = await getTransportBookingOptions({
+        origin,
+        destination,
+        departureDate: travelDate,
+        transportType: bookingType,
+        travelers,
+      });
+      setBookingResults(data.options || []);
+    } catch (err) {
+      setBookingError(err.message || "Unable to fetch booking options.");
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -125,23 +157,75 @@ function Transport() {
                 ))}
               </select>
             </div>
-
-            <div className="transport-field">
-              <label htmlFor="budget">Budget guidance</label>
-              <input
-                id="budget"
-                type="text"
-                value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                placeholder="e.g. low cost, moderate, high comfort, 50 USD"
-              />
-            </div>
           </div>
 
           <button className="transport-submit" type="submit" disabled={!canSubmit || loading}>
             {loading ? "Generating transport plan..." : "Generate transport plan"}
           </button>
         </form>
+      </section>
+
+      <section className="transport-booking-section">
+        <h2>Book transport</h2>
+        <form className="transport-form transport-booking-form" onSubmit={handleBookingSubmit}>
+          <div className="transport-grid">
+            <div className="transport-field">
+              <label htmlFor="bookingType">Booking type</label>
+              <select id="bookingType" value={bookingType} onChange={(event) => setBookingType(event.target.value)}>
+                <option value="flight">Flight</option>
+                <option value="train">Train</option>
+                <option value="bus">Bus</option>
+                <option value="car">Car rental</option>
+              </select>
+            </div>
+
+            <div className="transport-field">
+              <label htmlFor="travelers">Travelers</label>
+              <input
+                id="travelers"
+                type="number"
+                min="1"
+                value={travelers}
+                onChange={(event) => setTravelers(Number(event.target.value) || 1)}
+              />
+            </div>
+          </div>
+
+          <button className="transport-submit" type="submit" disabled={!canBook || bookingLoading}>
+            {bookingLoading ? "Searching booking options..." : "Find transport bookings"}
+          </button>
+
+          {bookingError && <div className="transport-error">{bookingError}</div>}
+        </form>
+
+        {bookingResults.length > 0 && (
+          <div className="transport-booking-results">
+            <h3>Recommended booking options</h3>
+            <div className="booking-card-grid">
+              {bookingResults.map((option, index) => (
+                <article key={index} className="booking-card">
+                  <div className="booking-card-header">
+                    <span className="booking-provider">{option.provider}</span>
+                    <span className="booking-mode">{option.mode}</span>
+                  </div>
+                  <p className="booking-route">{option.route}</p>
+                  <p>
+                    <strong>Departure:</strong> {option.departureTime} · <strong>Arrival:</strong> {option.arrivalTime}
+                  </p>
+                  <p>
+                    <strong>Travelers:</strong> {option.travelers}
+                  </p>
+                  <p className="booking-price">{option.price}</p>
+                  {option.bookingUrl && (
+                    <a className="booking-link" href={option.bookingUrl} target="_blank" rel="noreferrer">
+                      Book now
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="transport-summary">
